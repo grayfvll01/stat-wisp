@@ -1,0 +1,30 @@
+# CMake and Visual Studio outputs
+/build/
+/out/
+/dist/
+/.vs/
+CMakeUserPresets.json
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+
+# Compiled artifacts and packages
+*.obj
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.lib
+*.zip
+
+# Local runtime state
+settings.ini
+*.log
+/logs/
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

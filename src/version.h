@@ -1,0 +1,7 @@
+#pragma once
+
+#define GATE_VERSION_MAJOR 0
+#define GATE_VERSION_MINOR 3
+#define GATE_VERSION_PATCH 0
+#define GATE_VERSION_STRING "0.3.0"
+#define GATE_VERSION_WSTRING L"0.3.0"

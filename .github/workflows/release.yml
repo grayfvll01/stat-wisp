@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate tag and source version
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Tag must be vMAJOR.MINOR.PATCH.' }
+          if ((Get-Content .\src\version.h -Raw) -notmatch ('GATE_VERSION_STRING "' + [regex]::Escape($version) + '"')) {
+            throw "src/version.h does not match tag $version"
+          }
+          if ((Get-Content .\CMakeLists.txt -Raw) -notmatch ('project\(gate-monitor VERSION ' + [regex]::Escape($version) + ' LANGUAGES')) {
+            throw "CMakeLists.txt does not match tag $version"
+          }
+
+      - name: Build, test, and verify
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          .\scripts\build-release.ps1 -Version $version -ExeOnly
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/gate-monitor.exe
+            dist/SHA256SUMS.txt
