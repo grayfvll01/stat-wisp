@@ -1,11 +1,11 @@
 #include "app/MessageWindow.h"
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
 
-constexpr wchar_t kMessageWindowClass[] = L"gate-monitor-message-window";
+constexpr wchar_t kMessageWindowClass[] = L"stat-wisp-message-window";
 
 } // namespace
 
@@ -72,4 +72,4 @@ LRESULT CALLBACK MessageWindow::WindowProcedure(HWND window, UINT message, WPARA
     return DefWindowProcW(window, message, wParam, lParam);
 }
 
-} // namespace gate
+} // namespace statwisp

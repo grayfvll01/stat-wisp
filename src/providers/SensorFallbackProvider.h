@@ -6,7 +6,7 @@
 #include <chrono>
 #include <memory>
 
-namespace gate
+namespace statwisp
 {
 
 class SensorFallbackProvider final
@@ -28,4 +28,4 @@ class SensorFallbackProvider final
     std::chrono::steady_clock::time_point nextInitialize_{};
 };
 
-} // namespace gate
+} // namespace statwisp

@@ -4,7 +4,7 @@
 #include <memory>
 #include <optional>
 
-namespace gate
+namespace statwisp
 {
 
 class GpuPerformanceProvider final
@@ -24,4 +24,4 @@ class GpuPerformanceProvider final
     std::chrono::steady_clock::time_point nextInitialize_{};
 };
 
-} // namespace gate
+} // namespace statwisp

@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace gate
+namespace statwisp
 {
 
 class CpuProvider final
@@ -20,4 +20,4 @@ class CpuProvider final
     bool hasPrevious_{};
 };
 
-} // namespace gate
+} // namespace statwisp

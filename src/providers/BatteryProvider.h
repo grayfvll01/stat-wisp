@@ -2,7 +2,7 @@
 
 #include "monitoring/MetricSnapshot.h"
 
-namespace gate
+namespace statwisp
 {
 
 class BatteryProvider final
@@ -11,4 +11,4 @@ class BatteryProvider final
     static void Collect(MetricSnapshot &snapshot) noexcept;
 };
 
-} // namespace gate
+} // namespace statwisp

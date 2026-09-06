@@ -7,12 +7,12 @@
 #include <array>
 #include <string>
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
 
-constexpr wchar_t kClassName[] = L"gate-monitor-settings";
+constexpr wchar_t kClassName[] = L"stat-wisp-settings";
 constexpr int kMetricBase = 2000;
 constexpr int kInterval = 2100;
 constexpr int kStartup = 2101;
@@ -130,12 +130,12 @@ void CreateControls(WindowState &state)
     SendMessageW(compact, BM_SETCHECK, state.working.compactLabels ? BST_CHECKED : BST_UNCHECKED, 0);
     SendMessageW(round, BM_SETCHECK, state.working.roundValues ? BST_CHECKED : BST_UNCHECKED, 0);
 
-    const auto startup = AddControl(state, L"BUTTON", L"Start gate-monitor with Windows", BS_AUTOCHECKBOX | WS_TABSTOP,
+    const auto startup = AddControl(state, L"BUTTON", L"Start Stat Wisp with Windows", BS_AUTOCHECKBOX | WS_TABSTOP,
                                     18, startupY, 240, 23, kStartup);
     SendMessageW(startup, BM_SETCHECK, state.working.startWithWindows ? BST_CHECKED : BST_UNCHECKED, 0);
 
     state.explanation =
-        AddControl(state, L"STATIC", L"Select at least one metric. gate-monitor exists only in the notification area.",
+        AddControl(state, L"STATIC", L"Select at least one metric. Stat Wisp exists only in the notification area.",
                    SS_LEFT, 18, explanationY, 460, 32, kExplanation);
     state.start = AddControl(state, L"BUTTON", state.firstRun ? L"Start" : L"Save", BS_DEFPUSHBUTTON | WS_TABSTOP, 310,
                              buttonY, 78, 27, IDOK);
@@ -227,7 +227,7 @@ bool RegisterWindowClass(HINSTANCE instance)
     windowClass.cbSize = sizeof(windowClass);
     windowClass.lpfnWndProc = WindowProcedure;
     windowClass.hInstance = instance;
-    windowClass.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(IDI_GATE_MONITOR));
+    windowClass.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(IDI_STAT_WISP));
     windowClass.hIconSm = windowClass.hIcon;
     windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
@@ -254,7 +254,7 @@ bool SettingsWindow::Show(HINSTANCE instance, HWND owner, Settings &settings, bo
         EnableWindow(owner, FALSE);
     }
     HWND window = CreateWindowExW(WS_EX_DLGMODALFRAME, kClassName,
-                                  firstRun ? L"gate-monitor — first setup" : L"gate-monitor settings",
+                                  firstRun ? L"Stat Wisp — first setup" : L"Stat Wisp settings",
                                   WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, CW_USEDEFAULT, CW_USEDEFAULT, 510, 590,
                                   owner, nullptr, instance, &state);
     if (!window)
@@ -276,13 +276,23 @@ bool SettingsWindow::Show(HINSTANCE instance, HWND owner, Settings &settings, bo
     UpdateWindow(window);
 
     MSG message{};
-    while (state.window && GetMessageW(&message, nullptr, 0, 0) > 0)
+    int messageResult = 1;
+    while (state.window && (messageResult = GetMessageW(&message, nullptr, 0, 0)) > 0)
     {
         if (!IsDialogMessageW(window, &message))
         {
             TranslateMessage(&message);
             DispatchMessageW(&message);
         }
+    }
+    if (state.window)
+    {
+        DestroyWindow(state.window);
+    }
+    if (messageResult == 0)
+    {
+        // Preserve WM_QUIT for the application's outer message loop.
+        PostQuitMessage(static_cast<int>(message.wParam));
     }
     if (owner)
     {
@@ -296,4 +306,4 @@ bool SettingsWindow::Show(HINSTANCE instance, HWND owner, Settings &settings, bo
     return state.accepted;
 }
 
-} // namespace gate
+} // namespace statwisp

@@ -1,65 +1,36 @@
-param(
-    [string]$Source = (Join-Path $PSScriptRoot '..\assets\gate-monitor-source.png'),
-    [string]$Destination = (Join-Path $PSScriptRoot '..\assets\gate-monitor.ico')
-)
-
+param([string]$Destination = (Join-Path $PSScriptRoot '..\assets\stat-wisp.ico'))
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
-
+# Match the simple vector mark in assets/stat-wisp.svg at each native icon size.
 $sizes = @(16, 20, 24, 32, 48, 64, 128, 256)
-$sourceImage = [System.Drawing.Image]::FromFile((Resolve-Path -LiteralPath $Source))
 $images = [System.Collections.Generic.List[byte[]]]::new()
-try {
-    foreach ($size in $sizes) {
-        $bitmap = [System.Drawing.Bitmap]::new($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-        try {
-            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-            try {
-                $graphics.Clear([System.Drawing.Color]::Transparent)
-                $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
-                $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
-                $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-                $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-                $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-                $graphics.DrawImage($sourceImage, 0, 0, $size, $size)
-            } finally {
-                $graphics.Dispose()
-            }
-            for ($y = 0; $y -lt $size; $y++) {
-                for ($x = 0; $x -lt $size; $x++) {
-                    $color = $bitmap.GetPixel($x, $y)
-                    if ($color.A -eq 0) { continue }
-                    if ($size -le 32 -and $x -gt (0.66 * $size) -and $y -lt (0.35 * $size)) {
-                        $bitmap.SetPixel($x, $y, [System.Drawing.Color]::Transparent)
-                        continue
-                    }
-                    if ($color.R -gt 220 -and $color.G -gt 220 -and $color.B -gt 220) {
-                        $flat = [System.Drawing.Color]::FromArgb($color.A, 255, 255, 255)
-                    } elseif ($color.R -gt 170 -and $color.G -lt 170 -and $color.B -lt 100) {
-                        $flat = [System.Drawing.Color]::FromArgb($color.A, 255, 112, 0)
-                    } elseif ($color.G -gt 110 -and $color.B -gt 110 -and $color.B -gt $color.R) {
-                        $flat = [System.Drawing.Color]::FromArgb($color.A, 0, 205, 220)
-                    } else {
-                        $flat = [System.Drawing.Color]::FromArgb($color.A, 31, 42, 54)
-                    }
-                    $bitmap.SetPixel($x, $y, $flat)
-                }
-            }
-            $stream = [System.IO.MemoryStream]::new()
-            try {
-                $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
-                $images.Add($stream.ToArray())
-            } finally {
-                $stream.Dispose()
-            }
-        } finally {
-            $bitmap.Dispose()
-        }
+foreach ($size in $sizes) {
+    $bitmap = [Drawing.Bitmap]::new($size, $size)
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    $brush = [Drawing.SolidBrush]::new([Drawing.Color]::FromArgb(23, 39, 53))
+    $pen = [Drawing.Pen]::new([Drawing.Color]::FromArgb(70, 220, 191), 22)
+    $path = [Drawing.Drawing2D.GraphicsPath]::new()
+    $stream = [IO.MemoryStream]::new()
+    try {
+        $graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $graphics.ScaleTransform($size / 256.0, $size / 256.0)
+        $path.AddArc(8,8,64,64,180,90)
+        $path.AddArc(184,8,64,64,270,90)
+        $path.AddArc(184,184,64,64,0,90)
+        $path.AddArc(8,184,64,64,90,90)
+        $path.CloseFigure()
+        $graphics.FillPath($brush,$path)
+        $pen.StartCap = $pen.EndCap = [Drawing.Drawing2D.LineCap]::Round
+        $pen.LineJoin = [Drawing.Drawing2D.LineJoin]::Round
+        $points = [Drawing.PointF[]]@([Drawing.PointF]::new(48,80),[Drawing.PointF]::new(80,176),[Drawing.PointF]::new(128,116),[Drawing.PointF]::new(176,176),[Drawing.PointF]::new(208,80))
+        $graphics.DrawLines($pen,$points)
+        $bitmap.Save($stream,[Drawing.Imaging.ImageFormat]::Png)
+        $images.Add($stream.ToArray())
+        if ($size -eq 256) { $bitmap.Save((Join-Path $PSScriptRoot '..\assets\stat-wisp-source.png'),[Drawing.Imaging.ImageFormat]::Png) }
+    } finally {
+        $stream.Dispose(); $path.Dispose(); $pen.Dispose(); $brush.Dispose(); $graphics.Dispose(); $bitmap.Dispose()
     }
-} finally {
-    $sourceImage.Dispose()
 }
-
 $output = [System.IO.MemoryStream]::new()
 $writer = [System.IO.BinaryWriter]::new($output)
 try {

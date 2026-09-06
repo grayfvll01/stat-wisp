@@ -4,7 +4,7 @@
 #include <string>
 #include <string_view>
 
-namespace gate
+namespace statwisp
 {
 
 struct SemanticVersion
@@ -18,4 +18,4 @@ struct SemanticVersion
     friend bool operator==(const SemanticVersion &, const SemanticVersion &) = default;
 };
 
-} // namespace gate
+} // namespace statwisp

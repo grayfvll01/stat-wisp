@@ -8,7 +8,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace gate
+namespace statwisp
 {
 
 struct GpuPerformanceProvider::Impl
@@ -106,4 +106,4 @@ void GpuPerformanceProvider::Reset() noexcept
     nextInitialize_ = {};
 }
 
-} // namespace gate
+} // namespace statwisp

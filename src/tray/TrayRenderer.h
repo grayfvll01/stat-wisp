@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <optional>
 
-namespace gate
+namespace statwisp
 {
 
 class TrayRenderer final
@@ -41,4 +41,4 @@ class TrayRenderer final
     std::uint64_t generation_{1};
 };
 
-} // namespace gate
+} // namespace statwisp

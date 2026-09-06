@@ -4,7 +4,7 @@
 #include <array>
 #include <string_view>
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
@@ -263,6 +263,9 @@ HICON TrayRenderer::Render(const FormattedMetric &metric, MetricType type, std::
         DrawPixelText(memoryDc_, size_, metric.iconValue, 6, scaleX, 2, RGB(255, 255, 255));
     }
 
+    // GDI batches drawing. Flush before touching DIB memory directly or a new
+    // icon can contain stale pixels/alpha from the preceding reading.
+    GdiFlush();
     auto *pixels = static_cast<std::uint32_t *>(pixels_);
     for (int y = 0; y < size_; ++y)
     {
@@ -285,4 +288,4 @@ HICON TrayRenderer::Render(const FormattedMetric &metric, MetricType type, std::
     return icon;
 }
 
-} // namespace gate
+} // namespace statwisp

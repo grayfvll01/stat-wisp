@@ -1,31 +1,13 @@
-# gate-monitor
+# Stat Wisp
 
-gate-monitor is a small Windows tray utility that shows temperatures, fan speeds, usage, clocks, memory, network, disk, and battery readings as notification-area indicators. Temperature icons are green, amber, or red as they get hotter.
+Your PC's vitals, quietly in the Windows tray.
 
-It is built with C++23 and native Win32 APIs. It reads Windows APIs and performance counters, NVIDIA NVML or AMD ADL, and LibreHardwareMonitor/OpenHardwareMonitor WMI sensors when either monitor is running. There is no browser runtime, telemetry, or network service.
+Show temperatures, usage, memory, fan speeds, clocks, network, disk, and battery readings. Pick the icons you want; right-click any icon to change settings. Temperature colors go from green to amber to red.
 
-## Use
+![Stat Wisp settings](docs/images/settings.png)
 
-1. Download and run `gate-monitor.exe`.
-2. Select at least one metric.
-3. Right-click any gate-monitor tray icon to change metrics, interval, display, startup, or exit.
+[Download the latest release](https://github.com/grayfvll01/stat-wisp/releases/latest) · [Sensor support](docs/sensor-support.md)
 
-Unsupported readings are shown as `--`. CPU temperature and motherboard fan access varies by PC firmware; running LibreHardwareMonitor or OpenHardwareMonitor adds a compatible sensor source. Windows may initially place new icons in the tray overflow area.
+Windows 10/11, x64. Small native app, no telemetry, no bundled drivers. CPU temperature requires LibreHardwareMonitor or OpenHardwareMonitor with WMI enabled; unavailable readings show `--`.
 
-## Verify
-
-Compare the release SHA-256 value with:
-
-```powershell
-Get-FileHash .\gate-monitor.exe -Algorithm SHA256
-```
-
-## Build
-
-Requires Visual Studio with Desktop C++ and CMake:
-
-```powershell
-.\scripts\build-release.ps1
-```
-
-MIT licensed.
+Free and open source under the [MIT License](LICENSE). [Build from source](docs/development.md).

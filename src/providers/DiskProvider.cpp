@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <optional>
 
-namespace gate
+namespace statwisp
 {
 
 struct DiskProvider::Impl
@@ -125,4 +125,4 @@ void DiskProvider::Reset() noexcept
     nextInitialize_ = {};
 }
 
-} // namespace gate
+} // namespace statwisp

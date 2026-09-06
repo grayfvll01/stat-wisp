@@ -5,7 +5,7 @@
 #include <shellapi.h>
 #include <strsafe.h>
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
@@ -137,4 +137,4 @@ void TrayManager::RemoveAll() noexcept
     }
 }
 
-} // namespace gate
+} // namespace statwisp

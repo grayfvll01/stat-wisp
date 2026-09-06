@@ -2,7 +2,7 @@
 
 #include <Windows.h>
 
-namespace gate
+namespace statwisp
 {
 
 class MessageHandler
@@ -35,4 +35,4 @@ class MessageWindow final
     MessageHandler *handler_{};
 };
 
-} // namespace gate
+} // namespace statwisp

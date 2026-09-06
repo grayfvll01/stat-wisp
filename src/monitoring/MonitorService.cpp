@@ -2,7 +2,7 @@
 
 #include <Objbase.h>
 
-namespace gate
+namespace statwisp
 {
 
 MonitorService::~MonitorService()
@@ -31,6 +31,15 @@ void MonitorService::Stop() noexcept
     {
         worker_.request_stop();
         wake_.notify_all();
+        // Cancel a pending WMI/RPC call where supported. Never terminate just
+        // the worker: that could leave a driver or CRT lock held in this process.
+        CoCancelCall(GetThreadId(worker_.native_handle()), 0);
+        if (WaitForSingleObject(worker_.native_handle(), 3000) != WAIT_OBJECT_0)
+        {
+            // A third-party provider can ignore cancellation. All settings are
+            // already saved; Windows reclaims this process's resources on exit.
+            TerminateProcess(GetCurrentProcess(), ERROR_TIMEOUT);
+        }
         worker_.join();
     }
 }
@@ -86,6 +95,7 @@ void MonitorService::Run(std::stop_token stopToken)
     const auto comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (SUCCEEDED(comResult))
     {
+        CoEnableCallCancellation(nullptr);
         CoInitializeSecurity(nullptr, -1, nullptr, nullptr, RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE,
                              nullptr, EOAC_NONE, nullptr);
     }
@@ -112,6 +122,9 @@ void MonitorService::Run(std::stop_token stopToken)
 
         if (!paused)
         {
+#ifdef STAT_WISP_TEST_STALLED_PROVIDER
+            Sleep(INFINITE); // Only compiled into the shutdown regression test.
+#endif
             MetricSnapshot snapshot;
             const auto providers = current.RequiredProviders();
 
@@ -129,7 +142,8 @@ void MonitorService::Run(std::stop_token stopToken)
                 gpu_.Collect(snapshot, current);
             }
             const bool sensorFallbackNeeded = HasProvider(providers, Provider::Sensors) ||
-                                              current.IsEnabled(MetricType::GpuTemperature);
+                                              (current.IsEnabled(MetricType::GpuTemperature) &&
+                                               !snapshot.Get(MetricType::GpuTemperature));
             if (sensorFallbackNeeded)
             {
                 sensors_.Collect(snapshot, current);
@@ -174,8 +188,9 @@ void MonitorService::Run(std::stop_token stopToken)
     ResetProviders();
     if (SUCCEEDED(comResult))
     {
+        CoDisableCallCancellation(nullptr);
         CoUninitialize();
     }
 }
 
-} // namespace gate
+} // namespace statwisp

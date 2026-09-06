@@ -2,7 +2,7 @@
 
 #include <Windows.h>
 
-namespace gate
+namespace statwisp
 {
 
 void MemoryProvider::Collect(MetricSnapshot &snapshot) noexcept
@@ -22,4 +22,4 @@ void MemoryProvider::Collect(MetricSnapshot &snapshot) noexcept
     }
 }
 
-} // namespace gate
+} // namespace statwisp

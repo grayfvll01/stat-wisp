@@ -2,7 +2,7 @@
 
 #include <charconv>
 
-namespace gate
+namespace statwisp
 {
 
 std::optional<SemanticVersion> SemanticVersion::Parse(std::string_view text) noexcept
@@ -46,4 +46,4 @@ std::string SemanticVersion::ToString() const
     return std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(patch);
 }
 
-} // namespace gate
+} // namespace statwisp

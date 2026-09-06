@@ -1,12 +1,12 @@
 # Sensor support
 
-gate-monitor reports only values returned by the operating system, an already-installed display-driver API, or a compatible monitor already exposing WMI sensors. `--` means the selected metric is unsupported or temporarily unavailable; it is not a zero reading.
+stat-wisp reports only values returned by the operating system, an already-installed display-driver API, or a compatible monitor already exposing WMI sensors. `--` means the selected metric is unsupported or temporarily unavailable; it is not a zero reading.
 
 | Metric | Windows native | NVIDIA NVML | AMD ADL | LHM/OHM WMI | Notes |
 |---|---:|---:|---:|---:|---|
 | CPU usage | Yes | — | — | — | `GetSystemTimes`; all logical processors |
 | CPU reported clock | Yes | — | — | — | Average OS `CurrentMhz`; not effective clock |
-| CPU temperature | Limited | — | — | Yes | Package/die sensor preferred; thermal-zone fallback is firmware-dependent |
+| CPU temperature | No | — | — | Yes | Requires a running package/die sensor provider; firmware thermal zones are not CPU temperature |
 | CPU/system fan RPM | No | — | — | Yes | CPU name matching plus the fastest other exposed motherboard fan |
 | RAM usage | Yes | — | — | — | Physical memory load |
 | Available RAM | Yes | — | — | — | Available physical memory |
@@ -26,7 +26,7 @@ gate-monitor reports only values returned by the operating system, an already-in
 
 ### NVIDIA
 
-The application loads `nvml.dll` dynamically from the normal Windows/driver locations and monitors the first NVML device. Temperature, utilization, graphics clock, memory clock, memory use, and fan percentage are implemented. NVML is never shipped or downloaded by gate-monitor.
+The application loads `nvml.dll` dynamically from the normal Windows/driver locations and monitors the first NVML device. Temperature, utilization, graphics clock, memory clock, memory use, and fan percentage are implemented. NVML is never shipped or downloaded by stat-wisp.
 
 ### AMD
 
@@ -34,12 +34,12 @@ The application loads `atiadlxx.dll` dynamically and selects the first present A
 
 ### Intel
 
-Intel GPU utilization is available when the WDDM `GPU Engine` counters exist. Intel temperature, clock, and VRAM are not implemented because Windows provides no small stable public API for them and gate-monitor does not bundle a vendor runtime or privileged driver.
+Intel GPU utilization is available when the WDDM `GPU Engine` counters exist. Intel temperature, clock, and VRAM are not implemented because Windows provides no small stable public API for them and stat-wisp does not bundle a vendor runtime or privileged driver.
 
 ## CPU temperature limitation
 
-Windows does not expose a universal CPU package-temperature API. gate-monitor first consumes package/die sensors from the `ROOT\\LibreHardwareMonitor` or `ROOT\\OpenHardwareMonitor` WMI namespace when present. It otherwise uses the hottest plausible Windows thermal-zone performance-counter reading and then ACPI WMI. Firmware zones may represent a board or chassis region rather than the CPU package. gate-monitor does not bundle a kernel driver; direct on-die access therefore still depends on a compatible monitor running with its own hardware access enabled.
+Windows does not expose a universal CPU package-temperature API. stat-wisp first consumes package/die sensors from the `ROOT\\LibreHardwareMonitor` or `ROOT\\OpenHardwareMonitor` WMI namespace when present. If neither provider supplies a CPU sensor, the reading is unavailable. Firmware thermal zones and ACPI are excluded because they may represent a board or chassis region and remain constant. stat-wisp does not bundle a kernel driver; direct on-die access therefore still depends on a compatible monitor running with its own hardware access enabled.
 
 ## Multiple GPUs and adapters
 
-Version 0.3.0 uses the first detected NVIDIA or supported AMD vendor device for vendor-specific metrics. The WDDM fallback reports the busiest engine across all adapters. Explicit adapter selection and multi-GPU-per-metric icons remain unsupported.
+Version 0.4.0 uses the first detected NVIDIA or supported AMD vendor device for vendor-specific metrics. The WDDM fallback reports the busiest engine across all adapters. Explicit adapter selection and multi-GPU-per-metric icons remain unsupported.

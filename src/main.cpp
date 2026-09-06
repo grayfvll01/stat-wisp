@@ -24,22 +24,22 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
         LocalFree(arguments);
     }
 
-    HANDLE singleInstance = CreateMutexW(nullptr, FALSE, L"Local\\gate-monitor-6E48CF9D-44ED-4B20-AE74-6C7B52305FE4");
+    HANDLE singleInstance = CreateMutexW(nullptr, FALSE, L"Local\\stat-wisp-6E48CF9D-44ED-4B20-AE74-6C7B52305FE4");
     if (!singleInstance)
     {
         return 1;
     }
     if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
-        if (const auto existing = FindWindowW(gate::MessageWindow::ClassName(), nullptr))
+        if (const auto existing = FindWindowW(statwisp::MessageWindow::ClassName(), nullptr))
         {
-            PostMessageW(existing, gate::kShowMenuMessage, 0, 0);
+            PostMessageW(existing, statwisp::kShowMenuMessage, 0, 0);
         }
         CloseHandle(singleInstance);
         return 0;
     }
 
-    gate::Application application(instance, configureOnly);
+    statwisp::Application application(instance, configureOnly);
     const auto result = application.Run();
     CloseHandle(singleInstance);
     return result;

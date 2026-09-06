@@ -1,3 +1,3 @@
 #pragma once
 
-#define IDI_GATE_MONITOR 101
+#define IDI_STAT_WISP 101

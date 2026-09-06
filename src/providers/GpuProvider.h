@@ -4,7 +4,7 @@
 #include "providers/GpuPerformanceProvider.h"
 #include "providers/NvidiaProvider.h"
 
-namespace gate
+namespace statwisp
 {
 
 class GpuProvider final
@@ -21,4 +21,4 @@ class GpuProvider final
     unsigned int performanceFailures_{};
 };
 
-} // namespace gate
+} // namespace statwisp

@@ -11,7 +11,7 @@
 #include <system_error>
 #include <unordered_set>
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
@@ -58,7 +58,7 @@ template <typename Callback> void ForEachToken(std::string_view text, Callback &
 std::filesystem::path DefaultSettingsPath()
 {
     std::array<wchar_t, 32768> overridePath{};
-    const auto overrideLength = GetEnvironmentVariableW(L"GATE_MONITOR_SETTINGS_PATH", overridePath.data(),
+    const auto overrideLength = GetEnvironmentVariableW(L"STAT_WISP_SETTINGS_PATH", overridePath.data(),
                                                         static_cast<DWORD>(overridePath.size()));
     if (overrideLength != 0 && overrideLength < overridePath.size())
     {
@@ -69,9 +69,9 @@ std::filesystem::path DefaultSettingsPath()
     {
         std::filesystem::path path(localAppData);
         CoTaskMemFree(localAppData);
-        return path / L"gate-monitor" / L"settings.ini";
+        return path / L"stat-wisp" / L"settings.ini";
     }
-    return std::filesystem::temp_directory_path() / L"gate-monitor" / L"settings.ini";
+    return std::filesystem::temp_directory_path() / L"stat-wisp" / L"settings.ini";
 }
 
 } // namespace
@@ -160,10 +160,20 @@ Settings SettingsStore::Load(bool *recoveredFromError) const
     {
         return {};
     }
-    std::ostringstream contents;
-    contents << stream.rdbuf();
+    // Settings are normally under 1 KiB. Bound reads even if the file is corrupt
+    // or grows while it is being read.
+    constexpr std::size_t maxSettingsBytes = 64 * 1024;
+    std::string contents(maxSettingsBytes + 1, '\0');
+    stream.read(contents.data(), static_cast<std::streamsize>(contents.size()));
+    const auto bytesRead = static_cast<std::size_t>(stream.gcount());
+    if (bytesRead > maxSettingsBytes || stream.bad())
+    {
+        if (recoveredFromError) *recoveredFromError = true;
+        return {};
+    }
+    contents.resize(bytesRead);
     bool valid = false;
-    auto settings = SettingsCodec::Deserialize(contents.str(), nullptr, &valid);
+    auto settings = SettingsCodec::Deserialize(contents, nullptr, &valid);
     if (!valid && recoveredFromError)
     {
         *recoveredFromError = true;
@@ -374,4 +384,4 @@ Settings SettingsCodec::Deserialize(std::string_view text, bool *migrated, bool 
     return settings;
 }
 
-} // namespace gate
+} // namespace statwisp

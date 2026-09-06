@@ -2,7 +2,7 @@
 
 #include <Windows.h>
 
-namespace gate
+namespace statwisp
 {
 
 void BatteryProvider::Collect(MetricSnapshot &snapshot) noexcept
@@ -14,4 +14,4 @@ void BatteryProvider::Collect(MetricSnapshot &snapshot) noexcept
     }
 }
 
-} // namespace gate
+} // namespace statwisp

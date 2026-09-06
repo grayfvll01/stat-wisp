@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
@@ -31,12 +31,13 @@ bool NvidiaProvider::Initialize() noexcept
     }
     attempted_ = true;
 
-    library_ = LoadLibraryExW(L"nvml.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    library_ = LoadLibraryExW(L"nvml.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (!library_)
     {
         std::array<wchar_t, 1024> expanded{};
-        if (ExpandEnvironmentStringsW(L"%ProgramW6432%\\NVIDIA Corporation\\NVSMI\\nvml.dll", expanded.data(),
-                                      static_cast<DWORD>(expanded.size())) > 0)
+        const auto length = ExpandEnvironmentStringsW(L"%ProgramW6432%\\NVIDIA Corporation\\NVSMI\\nvml.dll", expanded.data(),
+                                                       static_cast<DWORD>(expanded.size()));
+        if (length > 0 && length <= expanded.size())
         {
             library_ = LoadLibraryExW(expanded.data(), nullptr,
                                       LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
@@ -154,4 +155,4 @@ void NvidiaProvider::Reset() noexcept
     attempted_ = false;
 }
 
-} // namespace gate
+} // namespace statwisp

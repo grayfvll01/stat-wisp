@@ -5,12 +5,12 @@
 #define STRINGIZE_IMPL(value) #value
 #define STRINGIZE(value) STRINGIZE_IMPL(value)
 
-IDI_GATE_MONITOR ICON "../assets/gate-monitor.ico"
+IDI_STAT_WISP ICON "../assets/stat-wisp.ico"
 1 RT_MANIFEST "app.manifest"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION GATE_VERSION_MAJOR,GATE_VERSION_MINOR,GATE_VERSION_PATCH,0
- PRODUCTVERSION GATE_VERSION_MAJOR,GATE_VERSION_MINOR,GATE_VERSION_PATCH,0
+ FILEVERSION STAT_WISP_VERSION_MAJOR,STAT_WISP_VERSION_MINOR,STAT_WISP_VERSION_PATCH,0
+ PRODUCTVERSION STAT_WISP_VERSION_MAJOR,STAT_WISP_VERSION_MINOR,STAT_WISP_VERSION_PATCH,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -26,11 +26,11 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "Lightweight Windows system tray monitor\0"
-            VALUE "FileVersion", GATE_VERSION_STRING "\0"
-            VALUE "InternalName", "gate-monitor\0"
-            VALUE "OriginalFilename", "gate-monitor.exe\0"
-            VALUE "ProductName", "gate-monitor\0"
-            VALUE "ProductVersion", GATE_VERSION_STRING "\0"
+            VALUE "FileVersion", STAT_WISP_VERSION_STRING "\0"
+            VALUE "InternalName", "stat-wisp\0"
+            VALUE "OriginalFilename", "stat-wisp.exe\0"
+            VALUE "ProductName", "Stat Wisp\0"
+            VALUE "ProductVersion", STAT_WISP_VERSION_STRING "\0"
             VALUE "LegalCopyright", "Copyright (c) 2026 grayfvll01\0"
         END
     END

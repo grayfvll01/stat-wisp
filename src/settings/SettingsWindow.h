@@ -4,7 +4,7 @@
 
 #include <Windows.h>
 
-namespace gate
+namespace statwisp
 {
 
 class SettingsWindow final
@@ -13,4 +13,4 @@ class SettingsWindow final
     [[nodiscard]] static bool Show(HINSTANCE instance, HWND owner, Settings &settings, bool firstRun);
 };
 
-} // namespace gate
+} // namespace statwisp

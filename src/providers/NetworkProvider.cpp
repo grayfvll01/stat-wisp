@@ -5,7 +5,7 @@
 #include <Windows.h>
 #include <iphlpapi.h>
 
-namespace gate
+namespace statwisp
 {
 
 void NetworkProvider::Collect(MetricSnapshot &snapshot, bool downloadNeeded, bool uploadNeeded) noexcept
@@ -60,4 +60,4 @@ void NetworkProvider::Reset() noexcept
     hasPrevious_ = false;
 }
 
-} // namespace gate
+} // namespace statwisp

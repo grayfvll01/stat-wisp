@@ -4,7 +4,7 @@
 
 `wWinMain` opts into per-monitor-v2 DPI awareness and enforces a per-user single instance. After first-run configuration, `Application` creates a one-pixel, non-activating, hidden top-level Win32 window. It is intentionally a top-level window rather than `HWND_MESSAGE` so it receives broadcast messages such as `TaskbarCreated`, power changes, theme changes, and display changes. It is never shown and has `WS_EX_TOOLWINDOW`, so normal operation has no taskbar button or primary window.
 
-The first-run and Settings surfaces are small, native, modal Win32 windows created only on request. First run cannot be accepted with zero metrics. The installer invokes `--configure-only`; canceling that dialog returns a nonzero code so installation rolls back instead of leaving an invisible installed application.
+The first-run and Settings surfaces are small, native, modal Win32 windows created only on request. First run cannot be accepted with zero metrics. Configuration happens on first launch, so silent installation never waits for an interactive dialog.
 
 Each enabled metric is a separate `Shell_NotifyIcon` entry owned by the same hidden window and process. Every icon opens one shared native menu. Explorer recovery uses the registered `TaskbarCreated` message to add the current set again. Shutdown deletes all entries before the window/process exits.
 
@@ -14,7 +14,7 @@ There is one monitoring `std::jthread` in addition to the UI thread. A condition
 
 `Settings::RequiredProviders` is recalculated for every configuration. A provider is queried only while at least one enabled metric needs it. A configuration change resets provider state on the monitoring thread; disabling the final metric in a family stops its queries and unloads dynamic GPU libraries. Related values share a provider call where the API permits it (for example AMD activity returns load and clock together).
 
-Hardware sensors are the exception to ordinary direct Windows data. The sensor provider is created lazily and reads no more than once every two seconds. It first checks the LibreHardwareMonitor and OpenHardwareMonitor WMI namespaces, then Windows thermal-zone performance counters, then ACPI WMI. Missing external namespaces are retried periodically so starting a compatible monitor later works without restarting gate-monitor.
+Hardware sensors are the exception to ordinary direct Windows data. The sensor provider is created lazily and reads no more than once every two seconds. It checks only the LibreHardwareMonitor and OpenHardwareMonitor WMI namespaces. GPU-only temperature configurations skip WMI when the driver has already returned a value. Missing external namespaces are retried periodically so starting a compatible monitor later works without restarting stat-wisp.
 
 ## Native providers
 
@@ -24,7 +24,7 @@ Hardware sensors are the exception to ordinary direct Windows data. The sensor p
 - Network: aggregate octet deltas from active, connected, non-loopback `GetIfTable2` rows.
 - Disk rates/activity: one demand-driven PhysicalDisk PDH query.
 - Battery percentage: `GetSystemPowerStatus`.
-- CPU/firmware thermal: LibreHardwareMonitor/OpenHardwareMonitor WMI, Windows Thermal Zone Information PDH, then `MSAcpi_ThermalZoneTemperature`, with plausibility checking.
+- CPU temperature: LibreHardwareMonitor/OpenHardwareMonitor WMI package/die sensors. Thermal-zone and ACPI readings are not used.
 - Cross-vendor GPU usage fallback: the busiest Windows `GPU Engine` PDH counter.
 - NVIDIA: dynamically loaded NVML from the installed display driver, including graphics and memory clocks and fan percentage.
 - AMD: dynamically loaded ADL2 Overdrive 5 compatibility entry points from the installed display driver, including engine and memory clocks and fan percentage.
@@ -42,7 +42,7 @@ Windows, not applications, decides whether a notification icon is initially in t
 
 ## Settings and startup
 
-Settings are a small versioned UTF-8/ASCII INI-style file at `%LOCALAPPDATA%\\gate-monitor\\settings.ini`. The custom codec has no JSON dependency, ignores unknown keys for forward compatibility, validates intervals/order, and supports version migration. Writes happen only after a user change and use a same-directory temporary file plus `MoveFileEx(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)`.
+Settings are a small versioned UTF-8/ASCII INI-style file at `%LOCALAPPDATA%\\stat-wisp\\settings.ini`. The custom codec has no JSON dependency, ignores unknown keys for forward compatibility, validates intervals/order, and supports version migration. Writes happen only after a user change and use a same-directory temporary file plus `MoveFileEx(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)`.
 
 Start with Windows is the quoted executable path in `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run`. No task, service, administrator privilege, IPC, or background updater is used.
 

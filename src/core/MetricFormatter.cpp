@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cwchar>
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
@@ -74,6 +74,10 @@ FormattedMetric MetricFormatter::Format(MetricType type, std::optional<double> v
     {
         result.iconValue = L"--";
         result.tooltip = std::wstring(definition.name) + L": unavailable on this hardware/provider";
+        if (type == MetricType::CpuTemperature)
+        {
+            result.tooltip = L"CPU Temperature: unavailable; run LibreHardwareMonitor with WMI enabled";
+        }
         return result;
     }
 
@@ -136,4 +140,4 @@ FormattedMetric MetricFormatter::Format(MetricType type, std::optional<double> v
     return result;
 }
 
-} // namespace gate
+} // namespace statwisp

@@ -5,7 +5,7 @@
 
 #include <Windows.h>
 
-namespace gate
+namespace statwisp
 {
 
 class AmdProvider final
@@ -46,4 +46,4 @@ class AmdProvider final
     bool attempted_{};
 };
 
-} // namespace gate
+} // namespace statwisp

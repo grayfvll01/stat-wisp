@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <vector>
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
@@ -63,7 +63,7 @@ constexpr int kFanSpeedPercent = 1;
 
 void *__stdcall AdlAllocate(int bytes)
 {
-    return std::malloc(static_cast<std::size_t>(bytes));
+    return bytes > 0 ? std::malloc(static_cast<std::size_t>(bytes)) : nullptr;
 }
 
 template <typename Function> Function Resolve(HMODULE library, const char *name) noexcept
@@ -90,7 +90,7 @@ bool AmdProvider::Initialize() noexcept
     }
     attempted_ = true;
     library_ =
-        LoadLibraryExW(L"atiadlxx.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+        LoadLibraryExW(L"atiadlxx.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (!library_)
     {
         return false;
@@ -112,7 +112,7 @@ bool AmdProvider::Initialize() noexcept
     }
 
     int count = 0;
-    if (countAdapters(context_, &count) != kAdlOk || count <= 0)
+    if (countAdapters(context_, &count) != kAdlOk || count <= 0 || count > 256)
     {
         Reset();
         attempted_ = true;
@@ -216,4 +216,4 @@ void AmdProvider::Reset() noexcept
     attempted_ = false;
 }
 
-} // namespace gate
+} // namespace statwisp

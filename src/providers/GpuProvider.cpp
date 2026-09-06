@@ -1,6 +1,6 @@
 #include "providers/GpuProvider.h"
 
-namespace gate
+namespace statwisp
 {
 
 void GpuProvider::Collect(MetricSnapshot &snapshot, const Settings &settings) noexcept
@@ -73,4 +73,4 @@ void GpuProvider::Reset() noexcept
     performanceFailures_ = 0;
 }
 
-} // namespace gate
+} // namespace statwisp

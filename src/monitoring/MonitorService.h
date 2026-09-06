@@ -17,7 +17,7 @@
 #include <mutex>
 #include <thread>
 
-namespace gate
+namespace statwisp
 {
 
 class MonitorService final
@@ -60,4 +60,4 @@ class MonitorService final
     GpuProvider gpu_;
 };
 
-} // namespace gate
+} // namespace statwisp

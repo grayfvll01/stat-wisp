@@ -5,13 +5,13 @@
 #include <array>
 #include <string>
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
 
 constexpr wchar_t kRunKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-constexpr wchar_t kValueName[] = L"gate-monitor";
+constexpr wchar_t kValueName[] = L"stat-wisp";
 
 } // namespace
 
@@ -55,4 +55,4 @@ bool StartupManager::IsEnabled() noexcept
            ERROR_SUCCESS;
 }
 
-} // namespace gate
+} // namespace statwisp

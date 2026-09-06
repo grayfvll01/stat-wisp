@@ -3,8 +3,8 @@
 #include <Wbemidl.h>
 #include <Windows.h>
 #include <comdef.h>
-#include <pdh.h>
-#include <PdhMsg.h>
+
+
 
 #include <algorithm>
 #include <array>
@@ -16,7 +16,7 @@
 #include <string_view>
 #include <vector>
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
@@ -183,24 +183,21 @@ struct SensorFallbackProvider::Impl
     IWbemLocator *locator{};
     IWbemServices *libreHardwareMonitor{};
     IWbemServices *openHardwareMonitor{};
-    IWbemServices *acpi{};
-    PDH_HQUERY thermalQuery{};
-    PDH_HCOUNTER thermalCounter{};
+
+
+
     std::chrono::steady_clock::time_point nextExternalConnect{};
 
     ~Impl()
     {
         ReleaseService(libreHardwareMonitor);
         ReleaseService(openHardwareMonitor);
-        ReleaseService(acpi);
+
         if (locator)
         {
             locator->Release();
         }
-        if (thermalQuery)
-        {
-            PdhCloseQuery(thermalQuery);
-        }
+
     }
 
     bool Connect(const wchar_t *name, IWbemServices **service)
@@ -228,21 +225,9 @@ struct SensorFallbackProvider::Impl
 
     bool Initialize()
     {
-        const auto locatorResult = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER, IID_IWbemLocator,
-                                                    reinterpret_cast<void **>(&locator));
-        if (PdhOpenQueryW(nullptr, 0, &thermalQuery) == ERROR_SUCCESS)
-        {
-            if (PdhAddEnglishCounterW(thermalQuery, L"\\Thermal Zone Information(*)\\Temperature", 0,
-                                      &thermalCounter) != ERROR_SUCCESS)
-            {
-                PdhCloseQuery(thermalQuery);
-                thermalQuery = nullptr;
-                thermalCounter = nullptr;
-            }
-        }
-        return SUCCEEDED(locatorResult) || thermalCounter;
+        return SUCCEEDED(CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER, IID_IWbemLocator,
+                                          reinterpret_cast<void **>(&locator)));
     }
-
     bool QueryExternal(IWbemServices *&service, SensorReadings &readings)
     {
         if (!service)
@@ -258,13 +243,15 @@ struct SensorFallbackProvider::Impl
             ReleaseService(service);
             return false;
         }
-        for (;;)
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        for (unsigned int rows = 0; rows < 4096 && std::chrono::steady_clock::now() < deadline; ++rows)
         {
             IWbemClassObject *object{};
             ULONG returned = 0;
             const auto next = enumerator->Next(500, 1, &object, &returned);
             if (next != WBEM_S_NO_ERROR || returned == 0)
             {
+                if (object) object->Release();
                 break;
             }
             const auto value = NumberProperty(object, L"Value");
@@ -279,81 +266,6 @@ struct SensorFallbackProvider::Impl
         return true;
     }
 
-    std::optional<double> QueryThermalCounter()
-    {
-        if (!thermalCounter || PdhCollectQueryData(thermalQuery) != ERROR_SUCCESS)
-        {
-            return std::nullopt;
-        }
-        DWORD bytes = 0;
-        DWORD count = 0;
-        if (PdhGetFormattedCounterArrayW(thermalCounter, PDH_FMT_DOUBLE, &bytes, &count, nullptr) != PDH_MORE_DATA ||
-            bytes == 0)
-        {
-            return std::nullopt;
-        }
-        std::vector<std::byte> buffer(bytes);
-        auto *items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W *>(buffer.data());
-        if (PdhGetFormattedCounterArrayW(thermalCounter, PDH_FMT_DOUBLE, &bytes, &count, items) != ERROR_SUCCESS)
-        {
-            return std::nullopt;
-        }
-        std::optional<double> hottest;
-        for (DWORD index = 0; index < count; ++index)
-        {
-            const auto &reading = items[index].FmtValue;
-            if (reading.CStatus != PDH_CSTATUS_VALID_DATA && reading.CStatus != PDH_CSTATUS_NEW_DATA)
-            {
-                continue;
-            }
-            const auto celsius = reading.doubleValue - 273.15;
-            if (celsius >= 0.0 && celsius <= 130.0 && (!hottest || celsius > *hottest))
-            {
-                hottest = celsius;
-            }
-        }
-        return hottest;
-    }
-
-    std::optional<double> QueryAcpi()
-    {
-        if (!Connect(L"ROOT\\WMI", &acpi))
-        {
-            return std::nullopt;
-        }
-        IEnumWbemClassObject *enumerator{};
-        const auto result = acpi->ExecQuery(
-            _bstr_t(L"WQL"), _bstr_t(L"SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature"),
-            WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY, nullptr, &enumerator);
-        if (FAILED(result) || !enumerator)
-        {
-            ReleaseService(acpi);
-            return std::nullopt;
-        }
-        std::optional<double> hottest;
-        for (;;)
-        {
-            IWbemClassObject *object{};
-            ULONG returned = 0;
-            const auto next = enumerator->Next(500, 1, &object, &returned);
-            if (next != WBEM_S_NO_ERROR || returned == 0)
-            {
-                break;
-            }
-            if (const auto raw = NumberProperty(object, L"CurrentTemperature"))
-            {
-                const auto celsius = *raw / 10.0 - 273.15;
-                if (celsius >= 0.0 && celsius <= 130.0 && (!hottest || celsius > *hottest))
-                {
-                    hottest = celsius;
-                }
-            }
-            object->Release();
-        }
-        enumerator->Release();
-        return hottest;
-    }
-
     SensorReadings Query()
     {
         SensorReadings readings;
@@ -366,14 +278,8 @@ struct SensorFallbackProvider::Impl
         }
         QueryExternal(libreHardwareMonitor, readings);
         QueryExternal(openHardwareMonitor, readings);
-        if (!readings.cpuTemperature)
-        {
-            readings.cpuTemperature = QueryThermalCounter();
-        }
-        if (!readings.cpuTemperature)
-        {
-            readings.cpuTemperature = QueryAcpi();
-        }
+
+
         return readings;
     }
 };
@@ -444,4 +350,4 @@ void SensorFallbackProvider::Reset() noexcept
     nextInitialize_ = {};
 }
 
-} // namespace gate
+} // namespace statwisp

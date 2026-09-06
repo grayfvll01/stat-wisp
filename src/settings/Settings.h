@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <string>
 
-namespace gate
+namespace statwisp
 {
 
 inline constexpr std::uint32_t kSettingsVersion = 2;
@@ -65,4 +65,4 @@ class SettingsCodec final
     [[nodiscard]] static Settings Deserialize(std::string_view text, bool *migrated = nullptr, bool *valid = nullptr);
 };
 
-} // namespace gate
+} // namespace statwisp

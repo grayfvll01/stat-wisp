@@ -5,7 +5,7 @@
 #include <chrono>
 #include <memory>
 
-namespace gate
+namespace statwisp
 {
 
 class DiskProvider final
@@ -25,4 +25,4 @@ class DiskProvider final
     std::chrono::steady_clock::time_point nextInitialize_{};
 };
 
-} // namespace gate
+} // namespace statwisp

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace gate
+namespace statwisp
 {
 
 class StartupManager final
@@ -10,4 +10,4 @@ class StartupManager final
     [[nodiscard]] static bool IsEnabled() noexcept;
 };
 
-} // namespace gate
+} // namespace statwisp

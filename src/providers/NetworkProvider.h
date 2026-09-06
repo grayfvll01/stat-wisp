@@ -5,7 +5,7 @@
 #include <chrono>
 #include <cstdint>
 
-namespace gate
+namespace statwisp
 {
 
 class NetworkProvider final
@@ -21,4 +21,4 @@ class NetworkProvider final
     bool hasPrevious_{};
 };
 
-} // namespace gate
+} // namespace statwisp

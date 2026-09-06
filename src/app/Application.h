@@ -10,7 +10,7 @@
 
 #include <memory>
 
-namespace gate
+namespace statwisp
 {
 
 inline constexpr UINT kSnapshotReadyMessage = WM_APP + 2;
@@ -46,4 +46,4 @@ class Application final : public MessageHandler
     bool configureOnly_{};
 };
 
-} // namespace gate
+} // namespace statwisp

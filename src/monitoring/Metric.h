@@ -6,7 +6,7 @@
 #include <optional>
 #include <string_view>
 
-namespace gate
+namespace statwisp
 {
 
 enum class MetricType : std::uint8_t
@@ -118,4 +118,4 @@ inline std::optional<MetricType> MetricFromKey(std::string_view key) noexcept
     return std::nullopt;
 }
 
-} // namespace gate
+} // namespace statwisp

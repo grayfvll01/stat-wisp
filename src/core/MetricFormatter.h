@@ -6,7 +6,7 @@
 #include <optional>
 #include <string>
 
-namespace gate
+namespace statwisp
 {
 
 struct FormattedMetric
@@ -24,4 +24,4 @@ class MetricFormatter final
     [[nodiscard]] static double CelsiusToFahrenheit(double celsius) noexcept;
 };
 
-} // namespace gate
+} // namespace statwisp

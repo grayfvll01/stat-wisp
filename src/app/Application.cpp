@@ -11,7 +11,7 @@
 #include <array>
 #include <string>
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
@@ -74,7 +74,7 @@ int Application::Run()
         if (settings_.startWithWindows && !StartupManager::SetEnabled(true))
         {
             settings_.startWithWindows = false;
-            MessageBoxW(nullptr, L"gate-monitor could not create the per-user startup entry.", L"gate-monitor",
+            MessageBoxW(nullptr, L"Stat Wisp could not create the per-user startup entry.", L"Stat Wisp",
                         MB_OK | MB_ICONWARNING);
         }
         else if (!settings_.startWithWindows)
@@ -91,7 +91,7 @@ int Application::Run()
 
     if (!messageWindow_.Create(instance_, *this))
     {
-        MessageBoxW(nullptr, L"gate-monitor could not create its notification window.", L"gate-monitor",
+        MessageBoxW(nullptr, L"Stat Wisp could not create its notification window.", L"Stat Wisp",
                     MB_OK | MB_ICONERROR);
         return 1;
     }
@@ -228,7 +228,7 @@ void Application::ShowContextMenu(POINT point)
         return;
     }
 
-    AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, L"gate-monitor  " GATE_VERSION_WSTRING);
+    AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, L"Stat Wisp  " STAT_WISP_VERSION_WSTRING);
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     for (const auto type : settings_.order)
     {
@@ -268,7 +268,7 @@ void Application::ShowContextMenu(POINT point)
     AddMenuItem(menu, kSettingsCommand, L"Settings…");
     AddMenuItem(menu, kAboutCommand, L"About");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AddMenuItem(menu, kExitCommand, L"Exit gate-monitor");
+    AddMenuItem(menu, kExitCommand, L"Exit Stat Wisp");
 
     SetForegroundWindow(messageWindow_.Handle());
     const auto command = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, point.x, point.y,
@@ -340,9 +340,9 @@ void Application::HandleCommand(UINT command)
         break;
     case kAboutCommand:
         MessageBoxW(nullptr,
-                    L"gate-monitor " GATE_VERSION_WSTRING L"\n\nLightweight native Windows tray monitor.\n"
+                    L"Stat Wisp " STAT_WISP_VERSION_WSTRING L"\n\nLightweight native Windows tray monitor.\n"
                     L"No telemetry, network access, or bundled sensor drivers.",
-                    L"About gate-monitor", MB_OK | MB_ICONINFORMATION);
+                    L"About Stat Wisp", MB_OK | MB_ICONINFORMATION);
         break;
     case kExitCommand:
         Exit();
@@ -364,14 +364,14 @@ void Application::ApplySettings(Settings next)
     if (!StartupManager::SetEnabled(next.startWithWindows))
     {
         next.startWithWindows = settings_.startWithWindows;
-        MessageBoxW(nullptr, L"The per-user Windows startup setting could not be changed.", L"gate-monitor",
+        MessageBoxW(nullptr, L"The per-user Windows startup setting could not be changed.", L"Stat Wisp",
                     MB_OK | MB_ICONWARNING);
     }
     settings_ = next;
     if (!settingsStore_.Save(settings_))
     {
         MessageBoxW(nullptr, L"Settings could not be saved. The current session will continue with them.",
-                    L"gate-monitor", MB_OK | MB_ICONWARNING);
+                    L"Stat Wisp", MB_OK | MB_ICONWARNING);
     }
     if (tray_)
     {
@@ -396,12 +396,12 @@ void Application::Exit()
         return;
     }
     exiting_ = true;
-    monitor_.Stop();
     if (tray_)
     {
         tray_->RemoveAll();
     }
+    monitor_.Stop();
     PostQuitMessage(0);
 }
 
-} // namespace gate
+} // namespace statwisp

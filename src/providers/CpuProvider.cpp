@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <vector>
 
-namespace gate
+namespace statwisp
 {
 namespace
 {
@@ -93,4 +93,4 @@ void CpuProvider::Reset() noexcept
     hasPrevious_ = false;
 }
 
-} // namespace gate
+} // namespace statwisp

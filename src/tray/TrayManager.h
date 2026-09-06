@@ -9,7 +9,7 @@
 #include <array>
 #include <string>
 
-namespace gate
+namespace statwisp
 {
 
 inline constexpr UINT kTrayCallbackMessage = WM_APP + 1;
@@ -44,4 +44,4 @@ class TrayManager final
     std::array<Entry, kMetricCount> entries_{};
 };
 
-} // namespace gate
+} // namespace statwisp

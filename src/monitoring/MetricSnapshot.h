@@ -6,7 +6,7 @@
 #include <chrono>
 #include <optional>
 
-namespace gate
+namespace statwisp
 {
 
 struct MetricSnapshot
@@ -24,4 +24,4 @@ struct MetricSnapshot
     }
 };
 
-} // namespace gate
+} // namespace statwisp
