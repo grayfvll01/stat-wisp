@@ -1,0 +1,23 @@
+name: Suggest a feature
+description: Explain a user problem and a concrete improvement.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe a situation where current behavior gets in your way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include a concrete example and any alternatives you considered.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Hardware or other context
+      description: For sensor requests, include the hardware model and any existing provider that exposes the reading.

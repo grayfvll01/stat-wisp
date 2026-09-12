@@ -1,0 +1,54 @@
+name: Report a bug
+description: Report a reproducible application problem or missing sensor reading.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the [user guide](https://github.com/grayfvll01/stat-wisp/blob/main/docs/user-guide.md) and [sensor support matrix](https://github.com/grayfvll01/stat-wisp/blob/main/docs/sensor-support.md), then search existing issues. Remove personal information from screenshots and attachments.
+  - type: input
+    id: version
+    attributes:
+      label: Stat Wisp version
+      description: Find this in the tray menu or About dialog.
+      placeholder: "0.4.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Installation type
+      options:
+        - Installer
+        - Portable ZIP or executable
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and build
+      description: Run winver to see the version and OS build.
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Relevant hardware and sensor provider
+      description: Include CPU/GPU models and driver version when relevant. For WMI sensors, include the external monitor name/version and whether it shows a live value itself.
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Selected metrics and update interval
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include what happens and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or additional details
+      description: Only include information relevant to this problem.

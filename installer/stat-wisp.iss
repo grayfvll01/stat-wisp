@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "0.4.0"
+  #define AppVersion "0.4.1"
 #endif
 
 #define AppName "Stat Wisp"
@@ -16,6 +16,7 @@ AppSupportURL={#AppUrl}/issues
 DefaultDirName={localappdata}\Programs\stat-wisp
 DefaultGroupName=Stat Wisp
 DisableProgramGroupPage=yes
+AllowNoIcons=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible

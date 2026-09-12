@@ -13,17 +13,22 @@ public static class ExitTestNative {
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr w, out uint id);
 }
 '@
+if ([ExitTestNative]::FindWindow('stat-wisp-message-window', $null) -ne [IntPtr]::Zero) {
+    throw 'Exit the existing Stat Wisp instance before running the application smoke test.'
+}
 New-Item -ItemType Directory -Force -Path $TestDirectory | Out-Null
-$env:STAT_WISP_SETTINGS_PATH = Join-Path $TestDirectory 'settings.ini'
-@'
+$previousSettingsPath = $env:STAT_WISP_SETTINGS_PATH
+$process = $null
+try {
+    $env:STAT_WISP_SETTINGS_PATH = Join-Path (Resolve-Path -LiteralPath $TestDirectory).Path 'settings.ini'
+    @'
 version=2
 enabled=cpu.usage,ram.usage
 interval_ms=500
 first_run_completed=1
 start_with_windows=0
 '@ | Set-Content -LiteralPath $env:STAT_WISP_SETTINGS_PATH -Encoding ascii
-$process = Start-Process -FilePath $Executable -WindowStyle Hidden -PassThru
-try {
+    $process = Start-Process -FilePath $Executable -WindowStyle Hidden -PassThru
     $deadline = [DateTime]::UtcNow.AddSeconds(8)
     do {
         Start-Sleep -Milliseconds 50
@@ -40,6 +45,9 @@ try {
     if ($process.ExitCode -ne $expected) { throw "Unexpected exit code: $($process.ExitCode), expected $expected" }
     Write-Output "Exit passed: $($watch.ElapsedMilliseconds) ms; code $($process.ExitCode)."
 } finally {
-    if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
-    Remove-Item Env:STAT_WISP_SETTINGS_PATH
+    if ($process) {
+        if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+        $process.Dispose()
+    }
+    $env:STAT_WISP_SETTINGS_PATH = $previousSettingsPath
 }

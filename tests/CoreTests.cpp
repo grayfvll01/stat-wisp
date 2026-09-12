@@ -1,9 +1,12 @@
 #include "core/MetricFormatter.h"
+#include "core/GpuEngineUsage.h"
+#include "core/NetworkRateTracker.h"
 #include "core/SemanticVersion.h"
 #include "settings/Settings.h"
 
 #include <iostream>
 #include <fstream>
+#include <limits>
 #include <Windows.h>
 #include <stdexcept>
 #include <string>
@@ -135,6 +138,61 @@ void TestVersionParsing()
     Check(!statwisp::SemanticVersion::Parse("1.x.3").has_value(), "invalid version was accepted");
 }
 
+void TestNetworkRates()
+{
+    statwisp::NetworkRateTracker tracker;
+    const auto start = std::chrono::steady_clock::time_point{};
+    Check(!tracker.Sample({{1, 1000, 2000}}, start), "first network sample had no baseline");
+    auto rates = tracker.Sample({{1, 1200, 2400}}, start + std::chrono::seconds(2));
+    Check(rates && rates->download == 100.0 && rates->upload == 200.0, "network rate calculation failed");
+
+    rates = tracker.Sample({{1, 1300, 2600}, {2, 1000000000, 2000000000}}, start + std::chrono::seconds(3));
+    Check(rates && rates->download == 100.0 && rates->upload == 200.0,
+          "connecting an interface counted its lifetime traffic");
+    rates = tracker.Sample({{2, 1000000300, 2000000500}, {1, 1500, 2800}}, start + std::chrono::seconds(4));
+    Check(rates && rates->download == 500.0 && rates->upload == 700.0,
+          "interface rates were not aggregated independently of enumeration order");
+    rates = tracker.Sample({{1, 1700, 3100}}, start + std::chrono::seconds(5));
+    Check(rates && rates->download == 200.0 && rates->upload == 300.0,
+          "disconnecting an interface discarded traffic on a remaining interface");
+
+    rates = tracker.Sample({{1, 20, 3300}}, start + std::chrono::seconds(6));
+    Check(rates && rates->download == 0.0 && rates->upload == 200.0,
+          "resetting a download counter corrupted the independent upload rate");
+    rates = tracker.Sample({{1, 120, 3400}, {2, 1000000900, 2000000900}}, start + std::chrono::seconds(7));
+    Check(rates && rates->download == 100.0 && rates->upload == 100.0,
+          "reconnecting an interface used a stale baseline");
+    rates = tracker.Sample({}, start + std::chrono::seconds(8));
+    Check(rates && rates->download == 0.0 && rates->upload == 0.0, "offline network did not report zero traffic");
+
+    tracker.Reset();
+    Check(!tracker.Sample({{1, 1000, 2000}}, start + std::chrono::seconds(9)),
+          "reset network tracker retained a stale baseline");
+}
+
+void TestGpuEngineUsage()
+{
+    statwisp::GpuEngineUsage engines;
+    Check(!engines.Busiest(), "missing GPU counters were reported as idle");
+    engines.Add(L"unrecognized", 100.0);
+    engines.Add(L"pid_1_luid_0x0_0x1234_phys_0_eng_0_engtype_3D", std::numeric_limits<double>::quiet_NaN());
+    engines.Add(L"pid_1_luid_0x0_0x1234_phys_0_eng_0_engtype_3D", -1.0);
+    Check(!engines.Busiest(), "invalid GPU counters were accepted");
+    engines.Add(L"pid_1_luid_0x0_0x1234_phys_0_eng_0_engtype_3D", 40.0);
+    engines.Add(L"pid_2_luid_0x0_0x1234_phys_0_eng_0_engtype_3D", 35.0);
+    Check(engines.Busiest() == 75.0, "GPU usage did not aggregate processes sharing an engine");
+    engines.Add(L"pid_1_luid_0x0_0x1234_phys_0_eng_1_engtype_Copy", 60.0);
+    engines.Add(L"pid_1_luid_0x0_0x5678_phys_0_eng_0_engtype_3D", 50.0);
+    engines.Add(L"pid_1_luid_0x0_0x1234_phys_1_eng_0_engtype_3D", 55.0);
+    Check(engines.Busiest() == 75.0, "independent GPU engines or adapters were combined");
+    engines.Add(L"pid_3_luid_0x0_0x1234_phys_0_eng_0_engtype_3D", 30.0);
+    Check(engines.Busiest() == 100.0, "GPU usage was not capped after aggregation");
+
+    statwisp::GpuEngineUsage idle;
+    idle.Add(L"pid_1_luid_0x0_0x1234_phys_0_eng_0_engtype_3D", 0.0);
+    Check(idle.Busiest() == 0.0, "valid idle GPU counter was reported as unavailable");
+}
+
 } // namespace
 
 void TestBoundedSettingsRead()
@@ -164,6 +222,8 @@ int main()
         TestFormatting();
         TestProviderActivation();
         TestVersionParsing();
+        TestNetworkRates();
+        TestGpuEngineUsage();
         TestBoundedSettingsRead();
         std::cout << "stat-wisp core tests passed\n";
         return 0;

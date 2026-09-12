@@ -7,6 +7,7 @@
 #include <array>
 #include <charconv>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <system_error>
 #include <unordered_set>
@@ -186,10 +187,13 @@ bool SettingsStore::Save(const Settings &source) const
     auto settings = source;
     settings.Normalize();
     std::error_code error;
-    std::filesystem::create_directories(path_.parent_path(), error);
-    if (error)
+    if (!path_.parent_path().empty())
     {
-        return false;
+        std::filesystem::create_directories(path_.parent_path(), error);
+        if (error)
+        {
+            return false;
+        }
     }
 
     auto temporary = path_;
@@ -202,8 +206,12 @@ bool SettingsStore::Save(const Settings &source) const
         }
         const auto serialized = SettingsCodec::Serialize(settings);
         stream.write(serialized.data(), static_cast<std::streamsize>(serialized.size()));
+        // Closing flushes the stream's buffer and can fail even when write()
+        // succeeded. Never replace the previous settings with a partial file.
+        stream.close();
         if (!stream)
         {
+            DeleteFileW(temporary.c_str());
             return false;
         }
     }
@@ -291,7 +299,7 @@ Settings SettingsCodec::Deserialize(std::string_view text, bool *migrated, bool 
             const auto value = line.substr(separator + 1);
             if (key == "version")
             {
-                sourceVersion = ParseUnsigned(value, 0);
+                sourceVersion = ParseUnsigned(value, std::numeric_limits<std::uint32_t>::max());
                 sawVersion = true;
             }
             else if (key == "enabled")

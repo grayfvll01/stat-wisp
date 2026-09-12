@@ -81,7 +81,17 @@ int Application::Run()
         {
             (void)StartupManager::SetEnabled(false);
         }
-        (void)settingsStore_.Save(settings_);
+        if (!settingsStore_.Save(settings_))
+        {
+            MessageBoxW(nullptr,
+                        configureOnly_ ? L"Settings could not be saved. Setup was not completed."
+                                       : L"Settings could not be saved. The current session will continue with them.",
+                        L"Stat Wisp", MB_OK | MB_ICONWARNING);
+            if (configureOnly_)
+            {
+                return 1;
+            }
+        }
     }
 
     if (configureOnly_)
@@ -211,6 +221,11 @@ LRESULT Application::HandleMessage(HWND window, UINT message, WPARAM wParam, LPA
 
 void Application::ShowContextMenu(POINT point)
 {
+    if (settingsOpen_)
+    {
+        SetForegroundWindow(GetLastActivePopup(messageWindow_.Handle()));
+        return;
+    }
     HMENU menu = CreatePopupMenu();
     HMENU metrics = CreatePopupMenu();
     HMENU intervals = CreatePopupMenu();
@@ -283,6 +298,12 @@ void Application::ShowContextMenu(POINT point)
 
 void Application::HandleCommand(UINT command)
 {
+    // Shell callbacks and posted commands still arrive while the settings
+    // window's modal loop is running. Keep its working copy authoritative.
+    if (exiting_ || (settingsOpen_ && command != kExitCommand))
+    {
+        return;
+    }
     if (command >= kMetricCommandBase && command < kMetricCommandBase + kMetricCount)
     {
         auto next = settings_;
@@ -361,7 +382,7 @@ void Application::ApplySettings(Settings next)
         return;
     }
     next.firstRunCompleted = true;
-    if (!StartupManager::SetEnabled(next.startWithWindows))
+    if (next.startWithWindows != settings_.startWithWindows && !StartupManager::SetEnabled(next.startWithWindows))
     {
         next.startWithWindows = settings_.startWithWindows;
         MessageBoxW(nullptr, L"The per-user Windows startup setting could not be changed.", L"Stat Wisp",
@@ -383,7 +404,10 @@ void Application::ApplySettings(Settings next)
 void Application::OpenSettings()
 {
     auto next = settings_;
-    if (SettingsWindow::Show(instance_, messageWindow_.Handle(), next, false))
+    settingsOpen_ = true;
+    const bool accepted = SettingsWindow::Show(instance_, messageWindow_.Handle(), next, false);
+    settingsOpen_ = false;
+    if (accepted && !exiting_)
     {
         ApplySettings(next);
     }

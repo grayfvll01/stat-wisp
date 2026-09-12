@@ -43,6 +43,7 @@ class Application final : public MessageHandler
     bool paused_{};
     bool suspended_{};
     bool exiting_{};
+    bool settingsOpen_{};
     bool configureOnly_{};
 };
 

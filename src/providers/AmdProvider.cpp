@@ -9,7 +9,8 @@ namespace
 {
 
 constexpr int kAdlOk = 0;
-constexpr int kAmdVendorId = 0x1002;
+// ADL reports the decimal value 1002 on Windows, unlike the PCI vendor ID 0x1002.
+constexpr int kAmdVendorId = 1002;
 constexpr std::size_t kAdlPath = 256;
 
 struct AdapterInfo
@@ -135,7 +136,7 @@ bool AmdProvider::Initialize() noexcept
         int enabled = 0;
         int version = 0;
         if (adapter.vendorId == kAmdVendorId && adapter.present &&
-            caps(context_, adapter.adapterIndex, &supported, &enabled, &version) == kAdlOk && supported && version >= 5)
+            caps(context_, adapter.adapterIndex, &supported, &enabled, &version) == kAdlOk && supported && version == 5)
         {
             adapterIndex_ = adapter.adapterIndex;
             break;

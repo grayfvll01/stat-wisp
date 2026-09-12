@@ -30,6 +30,12 @@ jobs:
           $header = Get-Content src/version.h -Raw
           if ($header -notmatch 'STAT_WISP_VERSION_STRING "(\d+\.\d+\.\d+)"') { throw 'Missing version.' }
           ./scripts/build-release.ps1 -Version $Matches[1]
+      - name: Test installation, repair, application Exit, and uninstall
+        shell: pwsh
+        run: |
+          $header = Get-Content src/version.h -Raw
+          if ($header -notmatch 'STAT_WISP_VERSION_STRING "(\d+\.\d+\.\d+)"') { throw 'Missing version.' }
+          ./scripts/test-release.ps1 -Version $Matches[1] -Install
       - name: Retain verified artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -47,6 +53,7 @@ jobs:
       contents: write
       actions: read
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Download this run's verified artifacts
         shell: pwsh
         env:
@@ -63,6 +70,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
+          $version = $env:RELEASE_TAG.Substring(1)
+          ./scripts/test-release.ps1 -Version $version
+          $notes = "docs/release-notes-$version.md"
+          if (-not (Test-Path -LiteralPath $notes)) { throw 'Reviewed release notes are required.' }
           $assets = (Get-ChildItem dist -File).FullName
-          gh release create $env:RELEASE_TAG @assets --verify-tag --draft --title "Stat Wisp $env:RELEASE_TAG" --generate-notes
+          gh release create $env:RELEASE_TAG @assets --verify-tag --draft --title "Stat Wisp $version" --notes-file $notes
           if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }

@@ -1,9 +1,7 @@
 #pragma once
 
+#include "core/NetworkRateTracker.h"
 #include "monitoring/MetricSnapshot.h"
-
-#include <chrono>
-#include <cstdint>
 
 namespace statwisp
 {
@@ -15,10 +13,7 @@ class NetworkProvider final
     void Reset() noexcept;
 
   private:
-    std::uint64_t previousReceived_{};
-    std::uint64_t previousSent_{};
-    std::chrono::steady_clock::time_point previousTime_{};
-    bool hasPrevious_{};
+    NetworkRateTracker rates_;
 };
 
 } // namespace statwisp

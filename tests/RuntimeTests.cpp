@@ -6,6 +6,55 @@
 #include <stdexcept>
 #include <vector>
 
+void TestSettingsPersistence()
+{
+    // A relative override must work without a parent directory component.
+    const std::filesystem::path path = "stat-wisp-runtime-settings-" + std::to_string(GetCurrentProcessId()) + ".ini";
+    auto temporary = path;
+    temporary += L".tmp";
+    struct Cleanup
+    {
+        const std::filesystem::path &path;
+        const std::filesystem::path &temporary;
+        ~Cleanup()
+        {
+            std::error_code ignored;
+            std::filesystem::remove(path, ignored);
+            std::filesystem::remove(temporary, ignored);
+        }
+    } cleanup{path, temporary};
+
+    statwisp::SettingsStore store(path);
+    statwisp::Settings settings;
+    settings.firstRunCompleted = true;
+    settings.updateIntervalMs = 30000;
+    if (!store.Save(settings)) throw std::runtime_error("Relative settings save failed");
+    if (store.Load().updateIntervalMs != 30000) throw std::runtime_error("Settings were not persisted");
+
+    // Denying delete sharing prevents atomic replacement, as can happen while
+    // another program holds the settings file open. Keep the old file intact.
+    HANDLE locked = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    if (locked == INVALID_HANDLE_VALUE) throw std::runtime_error("Cannot lock settings for failure test");
+    settings.updateIntervalMs = 500;
+    const bool saved = store.Save(settings);
+    CloseHandle(locked);
+    if (saved) throw std::runtime_error("Replacing locked settings incorrectly succeeded");
+    if (store.Load().updateIntervalMs != 30000) throw std::runtime_error("Failed save damaged previous settings");
+    if (std::filesystem::exists(temporary)) throw std::runtime_error("Failed save left a temporary settings file");
+    if (!store.Save(settings) || store.Load().updateIntervalMs != 500)
+        throw std::runtime_error("Settings could not be saved after the lock was released");
+
+    for (const auto version : {"", "garbage", "-1", "4294967296"})
+    {
+        bool valid = true;
+        bool migrated = true;
+        const auto loaded = statwisp::SettingsCodec::Deserialize(
+            std::string("version=") + version + "\nenabled=cpu.usage\nfirst_run_completed=1\n", &migrated, &valid);
+        if (valid || migrated || loaded.firstRunCompleted)
+            throw std::runtime_error("Corrupt settings version was accepted as a legacy version");
+    }
+}
+
 std::vector<unsigned char> Pixels(HICON icon)
 {
     ICONINFO info{};
@@ -31,6 +80,7 @@ std::vector<unsigned char> Pixels(HICON icon)
 int main()
 {
     try {
+        TestSettingsPersistence();
         statwisp::Settings settings;
         statwisp::TrayRenderer renderer;
         auto render = [&](double value) {

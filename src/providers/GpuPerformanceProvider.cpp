@@ -1,4 +1,5 @@
 #include "providers/GpuPerformanceProvider.h"
+#include "core/GpuEngineUsage.h"
 
 #include <Windows.h>
 #include <pdh.h>
@@ -61,19 +62,17 @@ struct GpuPerformanceProvider::Impl
         {
             return std::nullopt;
         }
-        std::optional<double> busiest;
+        GpuEngineUsage engines;
         for (DWORD index = 0; index < count; ++index)
         {
-            if (items[index].FmtValue.CStatus == ERROR_SUCCESS)
+            if (items[index].szName &&
+                (items[index].FmtValue.CStatus == PDH_CSTATUS_VALID_DATA ||
+                 items[index].FmtValue.CStatus == PDH_CSTATUS_NEW_DATA))
             {
-                const auto usage = std::clamp(items[index].FmtValue.doubleValue, 0.0, 100.0);
-                if (!busiest || usage > *busiest)
-                {
-                    busiest = usage;
-                }
+                engines.Add(items[index].szName, items[index].FmtValue.doubleValue);
             }
         }
-        return busiest;
+        return engines.Busiest();
     }
 };
 

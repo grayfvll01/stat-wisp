@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: User guide and troubleshooting
+    url: https://github.com/grayfvll01/stat-wisp/blob/main/docs/user-guide.md
+    about: Installation, settings, updating, removal, and common problems.
+  - name: Supported sensors
+    url: https://github.com/grayfvll01/stat-wisp/blob/main/docs/sensor-support.md
+    about: Check Windows, GPU driver, and external WMI sensor requirements.

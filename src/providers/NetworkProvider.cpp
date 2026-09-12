@@ -16,8 +16,8 @@ void NetworkProvider::Collect(MetricSnapshot &snapshot, bool downloadNeeded, boo
         return;
     }
 
-    std::uint64_t received = 0;
-    std::uint64_t sent = 0;
+    std::vector<NetworkInterfaceCounters> counters;
+    counters.reserve(table->NumEntries);
     for (ULONG index = 0; index < table->NumEntries; ++index)
     {
         const auto &row = table->Table[index];
@@ -26,38 +26,26 @@ void NetworkProvider::Collect(MetricSnapshot &snapshot, bool downloadNeeded, boo
         {
             continue;
         }
-        received += row.InOctets;
-        sent += row.OutOctets;
+        counters.push_back({row.InterfaceLuid.Value, row.InOctets, row.OutOctets});
     }
     FreeMibTable(table);
 
-    const auto now = std::chrono::steady_clock::now();
-    if (hasPrevious_ && received >= previousReceived_ && sent >= previousSent_)
+    if (const auto rates = rates_.Sample(std::move(counters), std::chrono::steady_clock::now()))
     {
-        const auto seconds = std::chrono::duration<double>(now - previousTime_).count();
-        if (seconds > 0.0)
+        if (downloadNeeded)
         {
-            if (downloadNeeded)
-            {
-                snapshot.Set(MetricType::NetworkDownload, static_cast<double>(received - previousReceived_) / seconds);
-            }
-            if (uploadNeeded)
-            {
-                snapshot.Set(MetricType::NetworkUpload, static_cast<double>(sent - previousSent_) / seconds);
-            }
+            snapshot.Set(MetricType::NetworkDownload, rates->download);
+        }
+        if (uploadNeeded)
+        {
+            snapshot.Set(MetricType::NetworkUpload, rates->upload);
         }
     }
-    previousReceived_ = received;
-    previousSent_ = sent;
-    previousTime_ = now;
-    hasPrevious_ = true;
 }
 
 void NetworkProvider::Reset() noexcept
 {
-    previousReceived_ = previousSent_ = 0;
-    previousTime_ = {};
-    hasPrevious_ = false;
+    rates_.Reset();
 }
 
 } // namespace statwisp

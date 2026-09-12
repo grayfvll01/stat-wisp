@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(stat-wisp VERSION 0.4.0 LANGUAGES CXX RC)
+project(stat-wisp VERSION 0.4.1 LANGUAGES CXX RC)
 
 option(STAT_WISP_BUILD_TESTS "Build stat-wisp logic tests" ON)
 
@@ -108,4 +108,11 @@ if(BUILD_TESTING AND STAT_WISP_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test-exit.ps1 -Executable $<TARGET_FILE:stat-wisp-shutdown-test>
         -TestDirectory ${CMAKE_CURRENT_BINARY_DIR}/stalled-exit-test -Stalled)
     set_tests_properties(stat-wisp-exit stat-wisp-stalled-exit PROPERTIES RUN_SERIAL TRUE TIMEOUT 20)
+endif()
+
+if(BUILD_TESTING AND STAT_WISP_BUILD_TESTS)
+    add_test(NAME stat-wisp-settings-dialog COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -File
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test-settings-dialog.ps1 -Executable $<TARGET_FILE:stat-wisp>
+        -TestDirectory ${CMAKE_CURRENT_BINARY_DIR}/settings-dialog-test)
+    set_tests_properties(stat-wisp-settings-dialog PROPERTIES RUN_SERIAL TRUE TIMEOUT 20)
 endif()

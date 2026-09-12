@@ -1,6 +1,6 @@
 param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$Version = '0.4.0',
+    [string]$Version = '0.4.1',
     [switch]$ExeOnly
 )
 
@@ -37,8 +37,23 @@ function Find-Iscc {
 }
 
 $cmake = Find-CMake
-if ((Get-Content (Join-Path $repository 'src\version.h') -Raw) -notmatch ('STAT_WISP_VERSION_STRING "' + [regex]::Escape($Version) + '"')) {
+$versionHeader = Get-Content (Join-Path $repository 'src\version.h') -Raw
+if ($versionHeader -notmatch ('STAT_WISP_VERSION_STRING "' + [regex]::Escape($Version) + '"')) {
     throw 'Requested version does not match src/version.h.'
+}
+$versionParts = $Version.Split('.')
+$versionFields = @('MAJOR', 'MINOR', 'PATCH')
+for ($index = 0; $index -lt 3; $index++) {
+    if ($versionHeader -notmatch ('(?m)^#define STAT_WISP_VERSION_' + $versionFields[$index] + ' ' + $versionParts[$index] + '\s*$')) {
+        throw 'Numeric executable version does not match requested version.'
+    }
+}
+if ($versionHeader -notmatch ('STAT_WISP_VERSION_WSTRING L"' + [regex]::Escape($Version) + '"')) {
+    throw 'Displayed application version does not match requested version.'
+}
+[xml]$manifest = Get-Content (Join-Path $repository 'src\app.manifest') -Raw
+if ($manifest.assembly.assemblyIdentity.version -ne "$Version.0") {
+    throw 'Application manifest does not match requested version.'
 }
 if ((Get-Content (Join-Path $repository 'CMakeLists.txt') -Raw) -notmatch ('project\(stat-wisp VERSION ' + [regex]::Escape($Version) + ' LANGUAGES')) {
     throw 'Requested version does not match CMakeLists.txt.'
@@ -48,11 +63,11 @@ if (-not $ExeOnly -and -not $iscc) { throw 'Install Inno Setup 6 to build the re
 $ctest = Join-Path (Split-Path -Parent $cmake) 'ctest.exe'
 Write-Host "Using CMake: $cmake"
 
-& $cmake -S $repository -B $build -A x64 -DCMAKE_CONFIGURATION_TYPES=Release -DSTAT_WISP_BUILD_TESTS=ON
+& $cmake -S $repository -B $build -A x64 -DCMAKE_CONFIGURATION_TYPES=Release -DBUILD_TESTING=ON -DSTAT_WISP_BUILD_TESTS=ON
 if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed.' }
-& $cmake --build $build --config Release --parallel
+& $cmake --build $build --config Release --clean-first --parallel
 if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
-& $ctest --test-dir $build -C Release --output-on-failure
+& $ctest --test-dir $build -C Release --output-on-failure --no-tests=error
 if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
 
 if (Test-Path -LiteralPath $dist) {
@@ -109,6 +124,10 @@ $checksumLines = foreach ($file in $releaseFiles) {
     "$($hash.Hash.ToLowerInvariant())  $($file.Name)"
 }
 $checksumLines | Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Encoding ascii
+
+if (-not $ExeOnly) {
+    & (Join-Path $PSScriptRoot 'test-release.ps1') -Version $Version -DistDirectory $dist
+}
 
 Write-Host 'Release artifacts:'
 Get-ChildItem -LiteralPath $dist -File | ForEach-Object { Write-Host "  $($_.FullName)" }
