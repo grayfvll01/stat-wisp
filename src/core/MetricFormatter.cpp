@@ -22,14 +22,14 @@ std::wstring Percent(double value, const Settings &settings)
     return Number(value, settings.roundValues || value >= 99.95 ? 0 : 1);
 }
 
-std::wstring CompactRate(double value)
+std::wstring CompactRate(double value, double base = 1024.0)
 {
     value = std::max(0.0, value);
     static constexpr const wchar_t *kUnits[]{L"", L"K", L"M", L"G", L"T"};
     std::size_t unit = 0;
     while (value >= 999.5 && unit + 1 < std::size(kUnits))
     {
-        value /= 1024.0;
+        value /= base;
         ++unit;
     }
     const auto precision = value < 10.0 && unit != 0 ? 1 : 0;
@@ -130,7 +130,7 @@ FormattedMetric MetricFormatter::Format(MetricType type, std::optional<double> v
         break;
     case MetricType::CpuFanSpeed:
     case MetricType::SystemFanSpeed:
-        result.iconValue = CompactRate(*value);
+        result.iconValue = CompactRate(*value, 1000.0);
         longValue = Number(*value, 0) + L" RPM";
         break;
     case MetricType::Count:

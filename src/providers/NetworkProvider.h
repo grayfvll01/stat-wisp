@@ -9,7 +9,7 @@ namespace statwisp
 class NetworkProvider final
 {
   public:
-    void Collect(MetricSnapshot &snapshot, bool downloadNeeded, bool uploadNeeded) noexcept;
+    void Collect(MetricSnapshot &snapshot, bool downloadNeeded, bool uploadNeeded);
     void Reset() noexcept;
 
   private:

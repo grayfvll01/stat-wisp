@@ -5,7 +5,7 @@
 namespace statwisp
 {
 
-void BatteryProvider::Collect(MetricSnapshot &snapshot) noexcept
+void BatteryProvider::Collect(MetricSnapshot &snapshot)
 {
     SYSTEM_POWER_STATUS status{};
     if (GetSystemPowerStatus(&status) && status.BatteryFlag != 128 && status.BatteryLifePercent <= 100)

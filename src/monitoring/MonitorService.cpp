@@ -1,5 +1,7 @@
 #include "monitoring/MonitorService.h"
 
+#include "core/Log.h"
+
 #include <Objbase.h>
 
 namespace statwisp
@@ -83,6 +85,7 @@ MetricSnapshot MonitorService::LatestSnapshot() const
 
 void MonitorService::ResetProviders()
 {
+    failureLogged_.fill(false);
     cpu_.Reset();
     sensors_.Reset();
     network_.Reset();
@@ -128,39 +131,75 @@ void MonitorService::Run(std::stop_token stopToken)
             MetricSnapshot snapshot;
             const auto providers = current.RequiredProviders();
 
+            // One failing provider (for example an allocation failure or a
+            // misbehaving driver library) must not stop the others or the thread.
+            const auto guarded = [this](std::size_t index, const wchar_t *failure, auto &&collect, auto &&reset) {
+                try
+                {
+                    collect();
+                }
+                catch (...)
+                {
+                    reset();
+                    if (!failureLogged_[index])
+                    {
+                        failureLogged_[index] = true;
+                        LogError(failure);
+                    }
+                }
+            };
+
             if (HasProvider(providers, Provider::CpuNative))
             {
-                cpu_.Collect(snapshot, current.IsEnabled(MetricType::CpuUsage),
-                             current.IsEnabled(MetricType::CpuClock));
+                guarded(
+                    0, L"CPU readings failed and were reset.",
+                    [&] {
+                        cpu_.Collect(snapshot, current.IsEnabled(MetricType::CpuUsage),
+                                     current.IsEnabled(MetricType::CpuClock));
+                    },
+                    [this] { cpu_.Reset(); });
             }
             if (HasProvider(providers, Provider::Memory))
             {
-                memory_.Collect(snapshot);
+                guarded(1, L"Memory readings failed.", [&] { memory_.Collect(snapshot); }, [] {});
             }
             if (HasProvider(providers, Provider::Gpu))
             {
-                gpu_.Collect(snapshot, current);
+                guarded(2, L"GPU readings failed and were reset.", [&] { gpu_.Collect(snapshot, current); },
+                        [this] { gpu_.Reset(); });
             }
             const bool sensorFallbackNeeded = HasProvider(providers, Provider::Sensors) ||
                                               (current.IsEnabled(MetricType::GpuTemperature) &&
                                                !snapshot.Get(MetricType::GpuTemperature));
             if (sensorFallbackNeeded)
             {
-                sensors_.Collect(snapshot, current);
+                guarded(3, L"External sensor readings failed and were reset.",
+                        [&] { sensors_.Collect(snapshot, current); }, [this] { sensors_.Reset(); });
             }
             if (HasProvider(providers, Provider::Network))
             {
-                network_.Collect(snapshot, current.IsEnabled(MetricType::NetworkDownload),
-                                 current.IsEnabled(MetricType::NetworkUpload));
+                guarded(
+                    4, L"Network readings failed and were reset.",
+                    [&] {
+                        network_.Collect(snapshot, current.IsEnabled(MetricType::NetworkDownload),
+                                         current.IsEnabled(MetricType::NetworkUpload));
+                    },
+                    [this] { network_.Reset(); });
             }
             if (HasProvider(providers, Provider::Disk))
             {
-                disk_.Collect(snapshot, current.IsEnabled(MetricType::DiskRead),
-                              current.IsEnabled(MetricType::DiskWrite), current.IsEnabled(MetricType::DiskUtilization));
+                guarded(
+                    5, L"Disk readings failed and were reset.",
+                    [&] {
+                        disk_.Collect(snapshot, current.IsEnabled(MetricType::DiskRead),
+                                      current.IsEnabled(MetricType::DiskWrite),
+                                      current.IsEnabled(MetricType::DiskUtilization));
+                    },
+                    [this] { disk_.Reset(); });
             }
             if (HasProvider(providers, Provider::Battery))
             {
-                BatteryProvider::Collect(snapshot);
+                guarded(6, L"Battery readings failed.", [&] { BatteryProvider::Collect(snapshot); }, [] {});
             }
             snapshot.sampledAt = std::chrono::steady_clock::now();
             {

@@ -8,7 +8,7 @@ namespace statwisp
 class BatteryProvider final
 {
   public:
-    static void Collect(MetricSnapshot &snapshot) noexcept;
+    static void Collect(MetricSnapshot &snapshot);
 };
 
 } // namespace statwisp

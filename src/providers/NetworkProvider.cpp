@@ -8,7 +8,7 @@
 namespace statwisp
 {
 
-void NetworkProvider::Collect(MetricSnapshot &snapshot, bool downloadNeeded, bool uploadNeeded) noexcept
+void NetworkProvider::Collect(MetricSnapshot &snapshot, bool downloadNeeded, bool uploadNeeded)
 {
     MIB_IF_TABLE2 *table{};
     if (GetIfTable2(&table) != NO_ERROR || !table)
@@ -16,19 +16,29 @@ void NetworkProvider::Collect(MetricSnapshot &snapshot, bool downloadNeeded, boo
         return;
     }
 
+    struct TableGuard
+    {
+        MIB_IF_TABLE2 *table;
+        ~TableGuard()
+        {
+            FreeMibTable(table);
+        }
+    } guard{table};
+
     std::vector<NetworkInterfaceCounters> counters;
     counters.reserve(table->NumEntries);
     for (ULONG index = 0; index < table->NumEntries; ++index)
     {
         const auto &row = table->Table[index];
+        // NDIS filter interfaces mirror the counters of the adapter they filter.
         if (row.Type == IF_TYPE_SOFTWARE_LOOPBACK || row.Type == IF_TYPE_TUNNEL || row.OperStatus != IfOperStatusUp ||
+            row.InterfaceAndOperStatusFlags.FilterInterface ||
             row.MediaConnectState != MediaConnectStateConnected)
         {
             continue;
         }
         counters.push_back({row.InterfaceLuid.Value, row.InOctets, row.OutOctets});
     }
-    FreeMibTable(table);
 
     if (const auto rates = rates_.Sample(std::move(counters), std::chrono::steady_clock::now()))
     {

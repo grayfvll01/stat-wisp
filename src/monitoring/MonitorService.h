@@ -12,6 +12,7 @@
 
 #include <Windows.h>
 
+#include <array>
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
@@ -52,6 +53,7 @@ class MonitorService final
     mutable std::mutex snapshotMutex_;
     MetricSnapshot latest_;
 
+    std::array<bool, 7> failureLogged_{};
     CpuProvider cpu_;
     SensorFallbackProvider sensors_;
     MemoryProvider memory_;

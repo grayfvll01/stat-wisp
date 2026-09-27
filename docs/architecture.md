@@ -44,8 +44,14 @@ Windows, not applications, decides whether a notification icon is initially in t
 
 Settings are a small versioned UTF-8/ASCII INI-style file at `%LOCALAPPDATA%\\stat-wisp\\settings.ini`. The custom codec has no JSON dependency, ignores unknown keys for forward compatibility, validates intervals/order, and supports version migration. Writes happen only after a user change and use a same-directory temporary file plus `MoveFileEx(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)`.
 
-Start with Windows is the quoted executable path in `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run`. No task, service, administrator privilege, IPC, or background updater is used.
+Start with Windows is the quoted executable path in `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run`. No task, service, administrator privilege, or IPC is used.
+
+## Updates and diagnostics
+
+One update thread sleeps until its schedule (90 seconds after start, then daily) or a user request. It downloads `stat-wisp-update.ini` from the latest GitHub release over WinHTTP (HTTPS, TLS 1.2+, system proxy, bounded timeouts and sizes), and only offers strictly newer versions. An install downloads the matching asset, verifies its size and SHA-256, then either starts the installer with `/RELAUNCH=1` or, for a portable copy, renames the running executable, moves the verified file into place, and restarts with `--relaunch`. The `DisableUpdates` policy value stops all update activity.
+
+Errors and lifecycle events go to a 256 KiB rotating `stat-wisp.log` beside the settings. Unhandled exceptions, `std::terminate`, pure virtual calls, and invalid CRT parameters write a minidump (newest three kept) using `dbghelp.dll` from System32. Each sensor provider runs behind its own exception boundary, so one failure resets that provider without stopping the others.
 
 ## Resource decisions
 
-The Release target statically links the MSVC runtime and otherwise uses only Windows DLLs already in the operating system or display driver. There is no GUI framework, CRT redistributable requirement, bundled sensor library, GPL code, driver, telemetry, network client, or persistent logging thread. Major third-party dependencies are therefore zero.
+The Release target statically links the MSVC runtime and otherwise uses only Windows DLLs already in the operating system or display driver. There is no GUI framework, CRT redistributable requirement, bundled sensor library, GPL code, driver, or telemetry. The only network client is the update check, built on the system WinHTTP library. Major third-party dependencies are therefore zero.

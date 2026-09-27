@@ -10,11 +10,27 @@ param(
 $ErrorActionPreference = 'Stop'
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $dist = (Resolve-Path -LiteralPath $DistDirectory).Path
-$expected = @('LICENSE.txt', "stat-wisp-$Version-setup.exe", "stat-wisp-$Version-win-x64.zip", 'stat-wisp.exe')
+$expected = @('LICENSE.txt', "stat-wisp-$Version-setup.exe", "stat-wisp-$Version-win-x64.zip", 'stat-wisp.exe',
+    'stat-wisp-update.ini')
 $actual = @(Get-ChildItem -LiteralPath $dist -File | ForEach-Object Name)
 if (Compare-Object ($expected + 'SHA256SUMS.txt' | Sort-Object) ($actual | Sort-Object)) {
-    throw 'The release must contain exactly the executable, installer, portable ZIP, license, and checksum file.'
+    throw 'The release must contain exactly the executable, installer, portable ZIP, license, update manifest, and checksum file.'
 }
+
+# The update manifest must describe exactly these assets.
+$manifest = @{}
+foreach ($line in Get-Content -LiteralPath (Join-Path $dist 'stat-wisp-update.ini')) {
+    if ($line -match '^([a-z_0-9]+)=(.*)$') { $manifest[$Matches[1]] = $Matches[2] }
+}
+foreach ($asset in @(@{ Key = 'installer'; Name = "stat-wisp-$Version-setup.exe" }, @{ Key = 'portable'; Name = 'stat-wisp.exe' })) {
+    $file = Get-Item -LiteralPath (Join-Path $dist $asset.Name)
+    if ($manifest[$asset.Key] -ne $asset.Name -or
+        $manifest["$($asset.Key)_size"] -ne "$($file.Length)" -or
+        $manifest["$($asset.Key)_sha256"] -ne (Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant()) {
+        throw "Update manifest does not match $($asset.Name)."
+    }
+}
+if ($manifest['format'] -ne '1' -or $manifest['version'] -ne $Version) { throw 'Update manifest format or version is wrong.' }
 $seen = @{}
 foreach ($line in Get-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt')) {
     if ($line -notmatch '^([a-f0-9]{64})  ([^/\\]+)$') { throw "Invalid checksum line: $line" }
@@ -67,7 +83,7 @@ try {
         } finally { $sha.Dispose(); $stream.Dispose() }
     }
 } finally { $archive.Dispose() }
-Write-Host 'Package checks passed: exact assets, SHA-256, versions, x64, memory protections, ZIP contents, and license.'
+Write-Host 'Package checks passed: exact assets, update manifest, SHA-256, versions, x64, memory protections, ZIP contents, and license.'
 
 if (-not $Install) {
     if ($PreviousInstaller) { throw '-PreviousInstaller requires -Install.' }

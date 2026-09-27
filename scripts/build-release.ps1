@@ -1,6 +1,6 @@
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$Version = '0.4.1',
+    [ValidatePattern('^(\d+\.\d+\.\d+)?$')]
+    [string]$Version = '',
     [switch]$ExeOnly
 )
 
@@ -36,32 +36,17 @@ function Find-Iscc {
     return $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 }
 
+# VERSION is the single source of the release version.
+$sourceVersion = (Get-Content -LiteralPath (Join-Path $repository 'VERSION') -TotalCount 1).Trim()
+if ($sourceVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'VERSION must contain MAJOR.MINOR.PATCH.' }
+if (-not $Version) { $Version = $sourceVersion }
+if ($Version -ne $sourceVersion) { throw "Requested version $Version does not match VERSION ($sourceVersion)." }
+
 $cmake = Find-CMake
-$versionHeader = Get-Content (Join-Path $repository 'src\version.h') -Raw
-if ($versionHeader -notmatch ('STAT_WISP_VERSION_STRING "' + [regex]::Escape($Version) + '"')) {
-    throw 'Requested version does not match src/version.h.'
-}
-$versionParts = $Version.Split('.')
-$versionFields = @('MAJOR', 'MINOR', 'PATCH')
-for ($index = 0; $index -lt 3; $index++) {
-    if ($versionHeader -notmatch ('(?m)^#define STAT_WISP_VERSION_' + $versionFields[$index] + ' ' + $versionParts[$index] + '\s*$')) {
-        throw 'Numeric executable version does not match requested version.'
-    }
-}
-if ($versionHeader -notmatch ('STAT_WISP_VERSION_WSTRING L"' + [regex]::Escape($Version) + '"')) {
-    throw 'Displayed application version does not match requested version.'
-}
-[xml]$manifest = Get-Content (Join-Path $repository 'src\app.manifest') -Raw
-if ($manifest.assembly.assemblyIdentity.version -ne "$Version.0") {
-    throw 'Application manifest does not match requested version.'
-}
-if ((Get-Content (Join-Path $repository 'CMakeLists.txt') -Raw) -notmatch ('project\(stat-wisp VERSION ' + [regex]::Escape($Version) + ' LANGUAGES')) {
-    throw 'Requested version does not match CMakeLists.txt.'
-}
 $iscc = if (-not $ExeOnly) { Find-Iscc }
 if (-not $ExeOnly -and -not $iscc) { throw 'Install Inno Setup 6 to build the required installer.' }
 $ctest = Join-Path (Split-Path -Parent $cmake) 'ctest.exe'
-Write-Host "Using CMake: $cmake"
+Write-Host "Building Stat Wisp $Version with $cmake"
 
 & $cmake -S $repository -B $build -A x64 -DCMAKE_CONFIGURATION_TYPES=Release -DBUILD_TESTING=ON -DSTAT_WISP_BUILD_TESTS=ON
 if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed.' }
@@ -81,41 +66,54 @@ New-Item -ItemType Directory -Force -Path $dist | Out-Null
 
 $executable = Join-Path $build 'Release\stat-wisp.exe'
 if (-not (Test-Path -LiteralPath $executable)) { throw "Build did not produce $executable" }
-Copy-Item -LiteralPath $executable -Destination (Join-Path $dist 'stat-wisp.exe')
 $binaryVersion = (Get-Item -LiteralPath $executable).VersionInfo
 if ($binaryVersion.FileVersion -ne $Version -or $binaryVersion.ProductName -ne 'Stat Wisp') {
     throw 'Executable version or product name is incorrect.'
 }
+Copy-Item -LiteralPath $executable -Destination (Join-Path $dist 'stat-wisp.exe')
 Copy-Item -LiteralPath (Join-Path $repository 'LICENSE') -Destination (Join-Path $dist 'LICENSE.txt')
+
 if (-not $ExeOnly) {
     New-Item -ItemType Directory -Force -Path $portable | Out-Null
     Copy-Item -LiteralPath $executable -Destination (Join-Path $portable 'stat-wisp.exe')
     Copy-Item -LiteralPath (Join-Path $repository 'LICENSE') -Destination (Join-Path $portable 'LICENSE.txt')
 
     @"
-stat-wisp $Version
+Stat Wisp $Version
 
-A lightweight native Windows notification-area system monitor.
+Your PC's vitals, quietly in the Windows tray.
 
-Launch Stat Wisp and select at least one metric. Right-click any tray
-indicator to change metrics, update interval, display, startup, or settings.
+Run stat-wisp.exe and select at least one metric. Right-click any tray icon
+for settings, updates, pause, or exit. Settings are stored in
+%LOCALAPPDATA%\stat-wisp\settings.ini.
 
-Unsupported hardware sensor values are shown as --. See the repository
-documentation for the exact vendor and sensor support matrix.
+Unsupported sensor values are shown as --.
 
 https://github.com/grayfvll01/stat-wisp
 "@ | Set-Content -LiteralPath (Join-Path $portable 'README.txt') -Encoding utf8
 
     $zip = Join-Path $dist "stat-wisp-$Version-win-x64.zip"
     Compress-Archive -Path (Join-Path $portable '*') -DestinationPath $zip -CompressionLevel Optimal
+    Remove-Item -LiteralPath $portable -Recurse -Force
 
-    if ($iscc) {
-        Write-Host "Using Inno Setup: $iscc"
-        & $iscc "/DAppVersion=$Version" (Join-Path $repository 'installer\stat-wisp.iss')
-        if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
-    } else {
-        throw 'Inno Setup 6 was not found.'
-    }
+    Write-Host "Using Inno Setup: $iscc"
+    & $iscc "/DAppVersion=$Version" (Join-Path $repository 'installer\stat-wisp.iss')
+    if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
+
+    # In-app updates read this manifest from the latest published release.
+    $installer = Get-Item -LiteralPath (Join-Path $dist "stat-wisp-$Version-setup.exe")
+    $standalone = Get-Item -LiteralPath (Join-Path $dist 'stat-wisp.exe')
+    $manifest = @(
+        'format=1'
+        "version=$Version"
+        "installer=$($installer.Name)"
+        "installer_sha256=$((Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant())"
+        "installer_size=$($installer.Length)"
+        "portable=$($standalone.Name)"
+        "portable_sha256=$((Get-FileHash -LiteralPath $standalone.FullName -Algorithm SHA256).Hash.ToLowerInvariant())"
+        "portable_size=$($standalone.Length)"
+    ) -join "`n"
+    [IO.File]::WriteAllText((Join-Path $dist 'stat-wisp-update.ini'), "$manifest`n", [Text.Encoding]::ASCII)
 }
 
 $releaseFiles = Get-ChildItem -LiteralPath $dist -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | Sort-Object Name

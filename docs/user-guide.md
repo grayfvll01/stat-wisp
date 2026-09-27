@@ -27,6 +27,7 @@ Right-click any Stat Wisp icon to open the shared menu.
 | **Pause monitoring / Resume monitoring** | Stop or resume sampling. Paused icons retain their last readings. |
 | **Restart monitoring** | Reconnect sensor providers and resume sampling. Some rates need a second sample. |
 | **Settings…** | Change metrics and preferences together, then click **Save**. |
+| **Check for updates** | Look for a newer release now. **Install update** appears when one is available. |
 | **About** | See the installed version. |
 | **Exit Stat Wisp** | Stop the application and remove its icons. |
 
@@ -50,11 +51,9 @@ If the provider cannot expose the sensor, Stat Wisp displays `--`. Installing St
 
 ## Update
 
-There is no automatic updater or in-app release check. Download updates from [GitHub Releases](https://github.com/grayfvll01/stat-wisp/releases/latest).
+Stat Wisp checks for a new release about 90 seconds after it starts and then once a day. When one is available, a notification appears; click it, or choose **Install update** in the tray menu. Stat Wisp downloads the release, checks its size and SHA-256 against the published manifest, installs it, and restarts. An installed copy updates through its installer; a portable copy replaces its own executable. Choose **Check for updates** in the tray menu to check now, and turn automatic checks off in **Settings**. See [deployment](deployment.md#disable-updates) to manage updates centrally.
 
-1. Right-click an icon and choose **Exit Stat Wisp**.
-2. For an installed copy, run the new installer using the existing installation folder. For a portable copy, replace the files in its existing folder with the new ZIP's contents.
-3. Launch Stat Wisp. Existing saved preferences are reused.
+To update manually instead, choose **Exit Stat Wisp**, then run the new installer or replace the portable folder's files with the new ZIP's contents.
 
 The installed and portable editions share `%LOCALAPPDATA%\stat-wisp\settings.ini`. Back up this file if you want to preserve a particular configuration. If you move a portable copy or switch installation folders, toggle **Start with Windows** off and on from the copy you want to use; the startup entry records the executable's full path.
 

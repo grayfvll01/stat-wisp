@@ -1,4 +1,4 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
   - name: User guide and troubleshooting
     url: https://github.com/grayfvll01/stat-wisp/blob/main/docs/user-guide.md
@@ -6,3 +6,6 @@ contact_links:
   - name: Supported sensors
     url: https://github.com/grayfvll01/stat-wisp/blob/main/docs/sensor-support.md
     about: Check Windows, GPU driver, and external WMI sensor requirements.
+  - name: Report a security vulnerability
+    url: https://github.com/grayfvll01/stat-wisp/security/advisories/new
+    about: Report privately. Do not open a public issue.

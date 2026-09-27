@@ -1,44 +1,26 @@
 # Development and releases
 
-Build on Windows with Visual Studio's Desktop development with C++ workload (including the Windows SDK), CMake 3.25+, PowerShell, and Inno Setup 6:
+Build on Windows with Visual Studio's Desktop development with C++ workload (including the Windows SDK), CMake 3.25+, PowerShell 7, and Inno Setup 6:
 
 ```powershell
-./scripts/build-release.ps1 -Version 0.4.1
+./scripts/build-release.ps1          # clean build, all tests, installer, ZIP, update manifest, checksums
+./scripts/build-release.ps1 -ExeOnly # executable only
 ```
 
-Use `-ExeOnly` for a development build without the installer. The full build requires an installer; it never silently skips it. Binaries and archives live only in ignored `dist/` and GitHub Releases, not the source tree or README. The portable archive and installer include the complete MIT license.
+The version comes from the `VERSION` file; CMake generates the version header and application manifest from it. Binaries and archives live only in ignored `dist/` and GitHub Releases.
 
-The build checks the requested version against CMake, the version header's numeric/string fields, and the application manifest. It performs a clean Release x64 rebuild with tests enabled and fails if CTest finds no tests. The tests cover core behavior, Windows runtime behavior, settings-dialog isolation and saving, normal Exit, and Exit with a deliberately stalled provider.
+The tests cover core logic, the update manifest and SHA-256 checks, Windows runtime behavior, settings-dialog isolation and saving, normal Exit, Exit with a deliberately stalled provider, and an end-to-end update (`scripts/test-update.ps1`) against a local HTTP server: a tampered download must be rejected and a verified one installed in place with a restart.
 
-A full build also runs `scripts/test-release.ps1`. This checks the exact five release assets, complete and matching SHA-256 entries, executable and installer versions, x64 machine type, executable memory-protection flags, the MIT license, and the portable ZIP's expected contents. The executable and license inside the ZIP must match the standalone files.
+`scripts/test-release.ps1` checks the exact six release assets, the update manifest against the actual files, SHA-256 entries, versions, x64 machine type, memory-protection flags, the license, and the portable ZIP. Add `-Install` to exercise per-user install, repair, launch/Exit, and silent uninstall on a machine without Stat Wisp installed, and `-PreviousInstaller <path>` to test an upgrade.
 
-To repeat the package checks and exercise the installer on a disposable Windows account or clean machine:
-
-```powershell
-./scripts/test-release.ps1 -Version 0.4.1 -Install
-```
-
-The `-Install` check performs per-user installation, reinstalls the same package to check repair, launches the installed application and requests Exit, then silently uninstalls it. It refuses to run when an existing Stat Wisp installation, startup entry, or running process could be affected. Test installation files and logs are placed under an isolated `out/package-test-<id>` folder; the check still writes normal per-user installer registration. Omit `-Install` to verify packages without installing them. A repair check does not substitute for testing an upgrade from the previous published version.
-
-To also test an upgrade, supply a downloaded installer from the preceding release:
-
-```powershell
-./scripts/test-release.ps1 -Version 0.4.1 -Install -PreviousInstaller ./out/stat-wisp-0.4.0-setup.exe
-```
-
-This installs the preceding version in the same isolated folder before installing and checking the new version.
+`scripts/capture-settings.ps1` regenerates `docs/images/settings.png`.
 
 ## Release procedure
 
-The [0.4.1 release review](release-validation.md) records completed checks and coverage limits.
-
-1. Update CMake, `src/version.h` (numeric and string versions), the manifest, and packaging version defaults together.
-2. Write `docs/release-notes-<version>.md` with the actual changes, download choices, upgrade instructions, and known limitations. Update user documentation for changed behavior.
-3. Run the full Release build and package checks, then the installer smoke test in a clean environment. Smoke-test first setup, settings, tray controls, supported sensor readings, startup, and an upgrade from the preceding release. Record completed checks and untested hardware separately; do not reuse an older benchmark as new evidence.
-4. Commit and push the reviewed source and release notes, then push a matching `vMAJOR.MINOR.PATCH` tag. Never move a published tag.
-5. CI builds the executable, installer, portable archive, license, and SHA-256 checksums. It checks installation, repair, application Exit, and uninstall before retaining the assets.
-6. A separate job with release-write permission downloads that run's assets, verifies the packages again, and creates a draft with the checked-in release notes. Missing notes or failed checks stop release creation.
-7. Check the draft's assets, notes, CI results, and recorded validation before publishing the release. Upload every asset before publication; this also supports GitHub immutable releases.
+1. Set the new version in `VERSION` and move the `[Unreleased]` notes in `CHANGELOG.md` under a `## [X.Y.Z] - YYYY-MM-DD` heading.
+2. Run `./scripts/build-release.ps1`, then merge to `main`.
+3. Push a matching `vX.Y.Z` tag. CI rebuilds, tests, checks install/repair/uninstall, and creates a draft release with all assets and the changelog section as notes.
+4. Review the draft and publish it. Publishing makes it the latest release, which in-app updates pick up within a day. Never move a published tag.
 
 Workflow actions are pinned to commit hashes. Pull requests only receive read permission. Tag values are passed through environment variables, not interpolated into shell code. GitHub-hosted Windows runners must include Inno Setup 6; missing tools fail the build. Branch and pull-request builds validate artifacts; only matching tags create a draft release.
 

@@ -26,8 +26,9 @@ TrayManager::~TrayManager()
     RemoveAll();
 }
 
-void TrayManager::Sync(const Settings &settings, const MetricSnapshot &snapshot)
+bool TrayManager::Sync(const Settings &settings, const MetricSnapshot &snapshot)
 {
+    bool complete = true;
     for (const auto type : settings.order)
     {
         auto &entry = entries_[MetricIndex(type)];
@@ -38,28 +39,29 @@ void TrayManager::Sync(const Settings &settings, const MetricSnapshot &snapshot)
         }
         const auto value = snapshot.Get(type);
         const auto formatted = MetricFormatter::Format(type, value, settings);
-        AddOrUpdate(type, entry, formatted, value, false);
+        complete = AddOrUpdate(type, entry, formatted, value, false) && complete;
     }
+    return complete;
 }
 
-void TrayManager::Refresh(const Settings &settings, const MetricSnapshot &snapshot)
+bool TrayManager::Refresh(const Settings &settings, const MetricSnapshot &snapshot)
 {
     renderer_.Invalidate();
     for (auto &entry : entries_)
     {
         entry.renderKey.clear();
     }
-    Sync(settings, snapshot);
+    return Sync(settings, snapshot);
 }
 
-void TrayManager::Recreate(const Settings &settings, const MetricSnapshot &snapshot)
+bool TrayManager::Recreate(const Settings &settings, const MetricSnapshot &snapshot)
 {
     for (auto &entry : entries_)
     {
         entry.added = false;
         entry.renderKey.clear();
     }
-    Sync(settings, snapshot);
+    return Sync(settings, snapshot);
 }
 
 bool TrayManager::AddOrUpdate(MetricType type, Entry &entry, const FormattedMetric &formatted,
@@ -91,13 +93,22 @@ bool TrayManager::AddOrUpdate(MetricType type, Entry &entry, const FormattedMetr
     data.hIcon = replacement;
     StringCchCopyW(data.szTip, std::size(data.szTip), formatted.tooltip.c_str());
 
-    const auto operation = entry.added ? NIM_MODIFY : NIM_ADD;
-    if (!Shell_NotifyIconW(operation, &data))
+    bool added = !entry.added && Shell_NotifyIconW(NIM_ADD, &data);
+    // NIM_ADD can report a timeout although Explorer added the icon, and an
+    // icon can disappear before TaskbarCreated arrives. Try the other operation.
+    bool shown = added || Shell_NotifyIconW(NIM_MODIFY, &data);
+    if (!shown && entry.added)
+    {
+        added = shown = Shell_NotifyIconW(NIM_ADD, &data) != FALSE;
+    }
+    if (!shown)
     {
         DestroyIcon(replacement);
+        entry.added = false;
+        entry.renderKey.clear();
         return false;
     }
-    if (!entry.added)
+    if (added || !entry.added)
     {
         data.uVersion = NOTIFYICON_VERSION_4;
         Shell_NotifyIconW(NIM_SETVERSION, &data);
@@ -127,6 +138,27 @@ void TrayManager::Remove(MetricType type, Entry &entry) noexcept
         DestroyIcon(entry.icon);
     }
     entry = {};
+}
+
+bool TrayManager::ShowBalloon(const std::wstring &title, const std::wstring &text) noexcept
+{
+    for (std::size_t index = 0; index < kMetricCount; ++index)
+    {
+        if (!entries_[index].added)
+        {
+            continue;
+        }
+        NOTIFYICONDATAW data{};
+        data.cbSize = sizeof(data);
+        data.hWnd = window_;
+        data.uID = IconId(static_cast<MetricType>(index));
+        data.uFlags = NIF_INFO;
+        data.dwInfoFlags = NIIF_INFO | NIIF_RESPECT_QUIET_TIME;
+        StringCchCopyW(data.szInfoTitle, std::size(data.szInfoTitle), title.c_str());
+        StringCchCopyW(data.szInfo, std::size(data.szInfo), text.c_str());
+        return Shell_NotifyIconW(NIM_MODIFY, &data) != FALSE;
+    }
+    return false;
 }
 
 void TrayManager::RemoveAll() noexcept

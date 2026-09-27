@@ -5,10 +5,12 @@
 #include "settings/Settings.h"
 #include "tray/TrayManager.h"
 #include "tray/TrayRenderer.h"
+#include "update/UpdateService.h"
 
 #include <Windows.h>
 
 #include <memory>
+#include <optional>
 
 namespace statwisp
 {
@@ -29,6 +31,9 @@ class Application final : public MessageHandler
     void HandleCommand(UINT command);
     void ApplySettings(Settings settings);
     void OpenSettings();
+    void ShowAbout();
+    void HandleUpdateState();
+    void SyncTray(bool refresh);
     void Exit();
 
     HINSTANCE instance_{};
@@ -39,7 +44,11 @@ class Application final : public MessageHandler
     TrayRenderer renderer_;
     std::unique_ptr<TrayManager> tray_;
     MonitorService monitor_;
+    UpdateService updates_;
+    std::uint64_t handledUpdateSequence_{};
+    std::optional<SemanticVersion> announcedVersion_;
     UINT taskbarCreatedMessage_{};
+    bool trayRetryPending_{};
     bool paused_{};
     bool suspended_{};
     bool exiting_{};

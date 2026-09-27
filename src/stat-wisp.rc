@@ -25,13 +25,14 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "FileDescription", "Lightweight Windows system tray monitor\0"
+            VALUE "CompanyName", "grayfvll01\0"
+            VALUE "FileDescription", "Stat Wisp\0"
             VALUE "FileVersion", STAT_WISP_VERSION_STRING "\0"
             VALUE "InternalName", "stat-wisp\0"
             VALUE "OriginalFilename", "stat-wisp.exe\0"
             VALUE "ProductName", "Stat Wisp\0"
             VALUE "ProductVersion", STAT_WISP_VERSION_STRING "\0"
-            VALUE "LegalCopyright", "Copyright (c) 2026 grayfvll01\0"
+            VALUE "LegalCopyright", "Copyright (c) 2026 grayfvll01. MIT License.\0"
         END
     END
     BLOCK "VarFileInfo"

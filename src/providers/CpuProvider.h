@@ -10,7 +10,7 @@ namespace statwisp
 class CpuProvider final
 {
   public:
-    void Collect(MetricSnapshot &snapshot, bool usageNeeded, bool clockNeeded) noexcept;
+    void Collect(MetricSnapshot &snapshot, bool usageNeeded, bool clockNeeded);
     void Reset() noexcept;
 
   private:

@@ -76,6 +76,7 @@ enabled=ram.usage
 interval_ms=30000
 first_run_completed=1
 start_with_windows=0
+check_for_updates=0
 fahrenheit=0
 '@ | Set-Content -LiteralPath $env:STAT_WISP_SETTINGS_PATH -Encoding ascii
     $process = Start-Process -FilePath $Executable -WindowStyle Hidden -PassThru

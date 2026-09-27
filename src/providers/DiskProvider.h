@@ -16,7 +16,7 @@ class DiskProvider final
     DiskProvider(const DiskProvider &) = delete;
     DiskProvider &operator=(const DiskProvider &) = delete;
 
-    void Collect(MetricSnapshot &snapshot, bool readNeeded, bool writeNeeded, bool utilizationNeeded) noexcept;
+    void Collect(MetricSnapshot &snapshot, bool readNeeded, bool writeNeeded, bool utilizationNeeded);
     void Reset() noexcept;
 
   private:

@@ -75,7 +75,7 @@ bool NvidiaProvider::Initialize() noexcept
     return true;
 }
 
-void NvidiaProvider::Collect(MetricSnapshot &snapshot, const Settings &settings) noexcept
+void NvidiaProvider::Collect(MetricSnapshot &snapshot, const Settings &settings)
 {
     if (!Available())
     {

@@ -21,7 +21,7 @@ class NvidiaProvider final
     {
         return device_ != nullptr;
     }
-    void Collect(MetricSnapshot &snapshot, const Settings &settings) noexcept;
+    void Collect(MetricSnapshot &snapshot, const Settings &settings);
     void Reset() noexcept;
 
   private:

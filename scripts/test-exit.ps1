@@ -27,6 +27,7 @@ enabled=cpu.usage,ram.usage
 interval_ms=500
 first_run_completed=1
 start_with_windows=0
+check_for_updates=0
 '@ | Set-Content -LiteralPath $env:STAT_WISP_SETTINGS_PATH -Encoding ascii
     $process = Start-Process -FilePath $Executable -WindowStyle Hidden -PassThru
     $deadline = [DateTime]::UtcNow.AddSeconds(8)

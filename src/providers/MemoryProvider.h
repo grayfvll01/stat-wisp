@@ -8,7 +8,7 @@ namespace statwisp
 class MemoryProvider final
 {
   public:
-    static void Collect(MetricSnapshot &snapshot) noexcept;
+    static void Collect(MetricSnapshot &snapshot);
 };
 
 } // namespace statwisp

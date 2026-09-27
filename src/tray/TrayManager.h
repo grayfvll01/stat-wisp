@@ -22,10 +22,14 @@ class TrayManager final
     TrayManager(const TrayManager &) = delete;
     TrayManager &operator=(const TrayManager &) = delete;
 
-    void Sync(const Settings &settings, const MetricSnapshot &snapshot);
-    void Refresh(const Settings &settings, const MetricSnapshot &snapshot);
-    void Recreate(const Settings &settings, const MetricSnapshot &snapshot);
+    // Each returns false when an enabled icon could not be shown (for example
+    // while Explorer is still starting); calling again retries it.
+    bool Sync(const Settings &settings, const MetricSnapshot &snapshot);
+    bool Refresh(const Settings &settings, const MetricSnapshot &snapshot);
+    bool Recreate(const Settings &settings, const MetricSnapshot &snapshot);
     void RemoveAll() noexcept;
+    // Shows a notification from the first visible icon. Returns false if none is visible.
+    bool ShowBalloon(const std::wstring &title, const std::wstring &text) noexcept;
 
   private:
     struct Entry

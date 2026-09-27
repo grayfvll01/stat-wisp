@@ -7,10 +7,13 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Validate release tag
@@ -20,22 +23,15 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+$') { throw 'Tag must be vMAJOR.MINOR.PATCH.' }
-          $version = $env:RELEASE_TAG.Substring(1)
-          if ((Get-Content src/version.h -Raw) -notmatch ('STAT_WISP_VERSION_STRING "' + [regex]::Escape($version) + '"')) {
-            throw 'Release tag does not match source version.'
+          if ((Get-Content VERSION -TotalCount 1).Trim() -ne $env:RELEASE_TAG.Substring(1)) {
+            throw 'Release tag does not match VERSION.'
           }
-      - name: Build executable, installer, and checksums
+      - name: Build, test, and package
         shell: pwsh
-        run: |
-          $header = Get-Content src/version.h -Raw
-          if ($header -notmatch 'STAT_WISP_VERSION_STRING "(\d+\.\d+\.\d+)"') { throw 'Missing version.' }
-          ./scripts/build-release.ps1 -Version $Matches[1]
+        run: ./scripts/build-release.ps1
       - name: Test installation, repair, application Exit, and uninstall
         shell: pwsh
-        run: |
-          $header = Get-Content src/version.h -Raw
-          if ($header -notmatch 'STAT_WISP_VERSION_STRING "(\d+\.\d+\.\d+)"') { throw 'Missing version.' }
-          ./scripts/test-release.ps1 -Version $Matches[1] -Install
+        run: ./scripts/test-release.ps1 -Version (Get-Content VERSION -TotalCount 1).Trim() -Install
       - name: Retain verified artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -45,6 +41,7 @@ jobs:
             dist/*.exe
             dist/*.zip
             dist/*.txt
+            dist/*.ini
   release:
     if: startsWith(github.ref, 'refs/tags/')
     needs: build
@@ -72,8 +69,11 @@ jobs:
         run: |
           $version = $env:RELEASE_TAG.Substring(1)
           ./scripts/test-release.ps1 -Version $version
-          $notes = "docs/release-notes-$version.md"
-          if (-not (Test-Path -LiteralPath $notes)) { throw 'Reviewed release notes are required.' }
+          # Release notes are the matching CHANGELOG.md section.
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $pattern = '(?ms)^## \[' + [regex]::Escape($version) + '\][^\n]*\n(.*?)(?=^## \[|\z)'
+          if ($changelog -notmatch $pattern -or -not $Matches[1].Trim()) { throw "CHANGELOG.md has no section for $version." }
+          $Matches[1].Trim() | Set-Content -LiteralPath release-notes.md -Encoding utf8
           $assets = (Get-ChildItem dist -File).FullName
-          gh release create $env:RELEASE_TAG @assets --verify-tag --draft --title "Stat Wisp $version" --notes-file $notes
+          gh release create $env:RELEASE_TAG @assets --verify-tag --draft --title "Stat Wisp $version" --notes-file release-notes.md
           if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }

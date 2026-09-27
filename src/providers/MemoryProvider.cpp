@@ -5,7 +5,7 @@
 namespace statwisp
 {
 
-void MemoryProvider::Collect(MetricSnapshot &snapshot) noexcept
+void MemoryProvider::Collect(MetricSnapshot &snapshot)
 {
     MEMORYSTATUSEX memory{};
     memory.dwLength = sizeof(memory);

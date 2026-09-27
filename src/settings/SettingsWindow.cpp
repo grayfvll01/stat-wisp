@@ -1,11 +1,14 @@
 #include "settings/SettingsWindow.h"
 
 #include "resource.h"
+#include "update/UpdateService.h"
 
 #include <CommCtrl.h>
 
+#include <algorithm>
 #include <array>
 #include <string>
+#include <vector>
 
 namespace statwisp
 {
@@ -20,6 +23,35 @@ constexpr int kFahrenheit = 2102;
 constexpr int kCompact = 2103;
 constexpr int kRound = 2104;
 constexpr int kExplanation = 2105;
+constexpr int kCheckUpdates = 2106;
+
+// Layout in device-independent pixels (96 DPI), scaled for each monitor.
+constexpr int kMargin = 20;
+constexpr int kColumn = 232;
+constexpr int kRow = 26;
+constexpr int kClientWidth = kMargin * 2 + kColumn * 2;
+constexpr int kFooterHeight = 58;
+constexpr int kButtonWidth = 92;
+constexpr int kButtonHeight = 30;
+constexpr DWORD kStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU;
+constexpr DWORD kExStyle = WS_EX_APPWINDOW;
+
+constexpr std::array<std::pair<const wchar_t *, std::uint32_t>, 7> kIntervals{{
+    {L"500 ms", 500},
+    {L"1 second", 1000},
+    {L"2 seconds", 2000},
+    {L"5 seconds", 5000},
+    {L"10 seconds", 10000},
+    {L"30 seconds", 30000},
+    {L"1 minute", 60000},
+}};
+
+struct Placed
+{
+    HWND window;
+    RECT bounds; // DIPs
+    bool heading;
+};
 
 struct WindowState
 {
@@ -29,23 +61,99 @@ struct WindowState
     Settings working;
     bool firstRun{};
     bool accepted{};
+    bool updatesManaged{};
+    UINT dpi{USER_DEFAULT_SCREEN_DPI};
     HFONT font{};
+    HFONT headingFont{};
+    std::vector<Placed> controls;
     std::array<HWND, kMetricCount> metricControls{};
     HWND interval{};
     HWND start{};
     HWND explanation{};
+    int footerTop{};
+
+    WindowState() = default;
+    WindowState(const WindowState &) = delete;
+    WindowState &operator=(const WindowState &) = delete;
+    ~WindowState()
+    {
+        DeleteFonts();
+    }
+    void DeleteFonts() noexcept
+    {
+        if (font)
+        {
+            DeleteObject(font);
+            font = nullptr;
+        }
+        if (headingFont)
+        {
+            DeleteObject(headingFont);
+            headingFont = nullptr;
+        }
+    }
 };
 
-HWND AddControl(WindowState &state, const wchar_t *className, const wchar_t *text, DWORD style, int x, int y, int width,
-                int height, int id)
+int Scale(const WindowState &state, int value) noexcept
 {
-    HWND control = CreateWindowExW(0, className, text, WS_CHILD | WS_VISIBLE | style, x, y, width, height, state.window,
-                                   reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), state.instance, nullptr);
-    if (control && state.font)
+    return MulDiv(value, static_cast<int>(state.dpi), USER_DEFAULT_SCREEN_DPI);
+}
+
+void CreateFonts(WindowState &state)
+{
+    state.DeleteFonts();
+    NONCLIENTMETRICSW metrics{};
+    metrics.cbSize = sizeof(metrics);
+    LOGFONTW base{};
+    if (SystemParametersInfoForDpi(SPI_GETNONCLIENTMETRICS, sizeof(metrics), &metrics, 0, state.dpi))
     {
-        SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(state.font), TRUE);
+        base = metrics.lfMessageFont;
+    }
+    else
+    {
+        base.lfHeight = -MulDiv(9, static_cast<int>(state.dpi), 72);
+        base.lfWeight = FW_NORMAL;
+        base.lfCharSet = DEFAULT_CHARSET;
+        base.lfQuality = CLEARTYPE_QUALITY;
+        wcscpy_s(base.lfFaceName, L"Segoe UI");
+    }
+    state.font = CreateFontIndirectW(&base);
+    auto heading = base;
+    heading.lfWeight = FW_SEMIBOLD;
+    heading.lfHeight = MulDiv(base.lfHeight, 10, 9);
+    state.headingFont = CreateFontIndirectW(&heading);
+}
+
+HWND AddControl(WindowState &state, const wchar_t *className, const wchar_t *text, DWORD style, int x, int y,
+                int width, int height, int id, bool heading = false)
+{
+    HWND control = CreateWindowExW(0, className, text, WS_CHILD | WS_VISIBLE | style, 0, 0, 0, 0, state.window,
+                                   reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), state.instance, nullptr);
+    if (control)
+    {
+        state.controls.push_back({control, RECT{x, y, x + width, y + height}, heading});
     }
     return control;
+}
+
+void ApplyLayout(WindowState &state)
+{
+    for (const auto &placed : state.controls)
+    {
+        SendMessageW(placed.window, WM_SETFONT,
+                     reinterpret_cast<WPARAM>(placed.heading ? state.headingFont : state.font), FALSE);
+        SetWindowPos(placed.window, nullptr, Scale(state, placed.bounds.left), Scale(state, placed.bounds.top),
+                     Scale(state, placed.bounds.right - placed.bounds.left),
+                     Scale(state, placed.bounds.bottom - placed.bounds.top), SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    InvalidateRect(state.window, nullptr, TRUE);
+}
+
+SIZE WindowSize(const WindowState &state) noexcept
+{
+    RECT rect{0, 0, Scale(state, kClientWidth), Scale(state, state.footerTop + kFooterHeight)};
+    AdjustWindowRectExForDpi(&rect, kStyle, FALSE, kExStyle, state.dpi);
+    return {rect.right - rect.left, rect.bottom - rect.top};
 }
 
 void RefreshStartState(WindowState &state)
@@ -62,54 +170,47 @@ void RefreshStartState(WindowState &state)
     ShowWindow(state.explanation, selected == 0 ? SW_SHOW : SW_HIDE);
 }
 
+void SetCheck(HWND control, bool checked) noexcept
+{
+    SendMessageW(control, BM_SETCHECK, checked ? BST_CHECKED : BST_UNCHECKED, 0);
+}
+
 void CreateControls(WindowState &state)
 {
     constexpr int columns = 2;
-    const int rows = static_cast<int>((kMetricCount + columns - 1) / columns);
-    const int metricsBottom = 46 + rows * 27;
-    const int intervalY = metricsBottom + 12;
-    const int displayY = metricsBottom + 53;
-    const int startupY = metricsBottom + 93;
-    const int explanationY = metricsBottom + 129;
-    const int buttonY = metricsBottom + 171;
+    constexpr int rows = static_cast<int>((kMetricCount + columns - 1) / columns);
+    constexpr DWORD checkbox = BS_AUTOCHECKBOX | WS_TABSTOP;
+    int y = 16;
 
-    state.font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+    AddControl(state, L"STATIC", L"Metrics", SS_LEFT | SS_NOPREFIX, kMargin, y, kColumn * 2, 22, -1, true);
+    y += 26;
     AddControl(state, L"STATIC",
-               state.firstRun ? L"Choose the metrics to display in the notification area:" : L"Visible tray metrics:",
-               SS_LEFT, 18, 16, 460, 22, -1);
-
+               state.firstRun ? L"Choose what to show. Each metric gets its own icon beside the clock."
+                              : L"Each selected metric gets its own icon beside the clock.",
+               SS_LEFT | SS_NOPREFIX, kMargin, y, kColumn * 2, 20, -1);
+    y += 28;
     for (std::size_t index = 0; index < kMetricCount; ++index)
     {
         const int column = static_cast<int>(index) / rows;
         const int row = static_cast<int>(index) % rows;
-        const int x = 18 + column * 235;
-        const int y = 46 + row * 27;
         const auto type = static_cast<MetricType>(index);
         state.metricControls[index] =
-            AddControl(state, L"BUTTON", Definition(type).name.data(), BS_AUTOCHECKBOX | WS_TABSTOP, x, y, 225, 23,
-                       kMetricBase + static_cast<int>(index));
-        SendMessageW(state.metricControls[index], BM_SETCHECK,
-                     state.working.IsEnabled(type) ? BST_CHECKED : BST_UNCHECKED, 0);
+            AddControl(state, L"BUTTON", Definition(type).name.data(), checkbox, kMargin + column * kColumn,
+                       y + row * kRow, kColumn - 12, 22, kMetricBase + static_cast<int>(index));
+        SetCheck(state.metricControls[index], state.working.IsEnabled(type));
     }
+    y += rows * kRow + 14;
 
-    AddControl(state, L"STATIC", L"Update interval:", SS_LEFT, 18, intervalY, 110, 22, -1);
-    state.interval = AddControl(state, WC_COMBOBOXW, L"", CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL, 132,
-                                intervalY - 5, 155, 220, kInterval);
-    constexpr std::array<std::pair<const wchar_t *, std::uint32_t>, 7> intervals{{
-        {L"500 ms", 500},
-        {L"1 second", 1000},
-        {L"2 seconds", 2000},
-        {L"5 seconds", 5000},
-        {L"10 seconds", 10000},
-        {L"30 seconds", 30000},
-        {L"1 minute", 60000},
-    }};
-    for (std::size_t index = 0; index < intervals.size(); ++index)
+    AddControl(state, L"STATIC", L"Display", SS_LEFT | SS_NOPREFIX, kMargin, y, kColumn * 2, 22, -1, true);
+    y += 32;
+    AddControl(state, L"STATIC", L"Update &interval:", SS_LEFT, kMargin, y + 4, 110, 20, -1);
+    state.interval = AddControl(state, WC_COMBOBOXW, L"", CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL,
+                                kMargin + 116, y, 160, 220, kInterval);
+    for (const auto &[label, milliseconds] : kIntervals)
     {
-        const auto item =
-            SendMessageW(state.interval, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(intervals[index].first));
-        SendMessageW(state.interval, CB_SETITEMDATA, item, intervals[index].second);
-        if (intervals[index].second == state.working.updateIntervalMs)
+        const auto item = SendMessageW(state.interval, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label));
+        SendMessageW(state.interval, CB_SETITEMDATA, item, milliseconds);
+        if (milliseconds == state.working.updateIntervalMs)
         {
             SendMessageW(state.interval, CB_SETCURSEL, item, 0);
         }
@@ -118,28 +219,41 @@ void CreateControls(WindowState &state)
     {
         SendMessageW(state.interval, CB_SETCURSEL, 1, 0);
     }
+    y += 36;
+    SetCheck(AddControl(state, L"BUTTON", L"&Fahrenheit", checkbox, kMargin, y, 120, 22, kFahrenheit),
+             state.working.fahrenheit);
+    SetCheck(AddControl(state, L"BUTTON", L"&Compact labels", checkbox, kMargin + 132, y, 150, 22, kCompact),
+             state.working.compactLabels);
+    SetCheck(AddControl(state, L"BUTTON", L"&Round values", checkbox, kMargin + 294, y, 150, 22, kRound),
+             state.working.roundValues);
+    y += kRow + 16;
 
-    AddControl(state, L"STATIC", L"Display:", SS_LEFT, 18, displayY + 4, 80, 22, -1);
-    const auto fahrenheit =
-        AddControl(state, L"BUTTON", L"Fahrenheit", BS_AUTOCHECKBOX | WS_TABSTOP, 100, displayY, 105, 23, kFahrenheit);
-    const auto compact =
-        AddControl(state, L"BUTTON", L"Compact labels", BS_AUTOCHECKBOX | WS_TABSTOP, 215, displayY, 115, 23, kCompact);
-    const auto round =
-        AddControl(state, L"BUTTON", L"Round values", BS_AUTOCHECKBOX | WS_TABSTOP, 340, displayY, 105, 23, kRound);
-    SendMessageW(fahrenheit, BM_SETCHECK, state.working.fahrenheit ? BST_CHECKED : BST_UNCHECKED, 0);
-    SendMessageW(compact, BM_SETCHECK, state.working.compactLabels ? BST_CHECKED : BST_UNCHECKED, 0);
-    SendMessageW(round, BM_SETCHECK, state.working.roundValues ? BST_CHECKED : BST_UNCHECKED, 0);
+    AddControl(state, L"STATIC", L"General", SS_LEFT | SS_NOPREFIX, kMargin, y, kColumn * 2, 22, -1, true);
+    y += 30;
+    SetCheck(AddControl(state, L"BUTTON", L"Start Stat Wisp with &Windows", checkbox, kMargin, y, kColumn * 2, 22,
+                        kStartup),
+             state.working.startWithWindows);
+    y += kRow;
+    const auto updates =
+        AddControl(state, L"BUTTON",
+                   state.updatesManaged ? L"Check for updates (managed by your organization)"
+                                        : L"Check for &updates automatically",
+                   checkbox, kMargin, y, kColumn * 2, 22, kCheckUpdates);
+    SetCheck(updates, !state.updatesManaged && state.working.checkForUpdates);
+    EnableWindow(updates, !state.updatesManaged);
+    y += kRow + 8;
 
-    const auto startup = AddControl(state, L"BUTTON", L"Start Stat Wisp with Windows", BS_AUTOCHECKBOX | WS_TABSTOP,
-                                    18, startupY, 240, 23, kStartup);
-    SendMessageW(startup, BM_SETCHECK, state.working.startWithWindows ? BST_CHECKED : BST_UNCHECKED, 0);
+    state.explanation = AddControl(state, L"STATIC", L"Select at least one metric to continue.",
+                                   SS_LEFT | SS_NOPREFIX, kMargin, y, kColumn * 2, 20, kExplanation);
+    y += 24;
 
-    state.explanation =
-        AddControl(state, L"STATIC", L"Select at least one metric. Stat Wisp exists only in the notification area.",
-                   SS_LEFT, 18, explanationY, 460, 32, kExplanation);
-    state.start = AddControl(state, L"BUTTON", state.firstRun ? L"Start" : L"Save", BS_DEFPUSHBUTTON | WS_TABSTOP, 310,
-                             buttonY, 78, 27, IDOK);
-    AddControl(state, L"BUTTON", L"Cancel", BS_PUSHBUTTON | WS_TABSTOP, 395, buttonY, 78, 27, IDCANCEL);
+    state.footerTop = y;
+    const int buttonY = y + (kFooterHeight - kButtonHeight) / 2;
+    const int cancelX = kClientWidth - kMargin - kButtonWidth;
+    state.start = AddControl(state, L"BUTTON", state.firstRun ? L"&Start" : L"&Save", BS_DEFPUSHBUTTON | WS_TABSTOP,
+                             cancelX - 8 - kButtonWidth, buttonY, kButtonWidth, kButtonHeight, IDOK);
+    AddControl(state, L"BUTTON", L"Cancel", BS_PUSHBUTTON | WS_TABSTOP, cancelX, buttonY, kButtonWidth,
+               kButtonHeight, IDCANCEL);
     RefreshStartState(state);
 }
 
@@ -159,6 +273,10 @@ void ReadControls(WindowState &state)
     state.working.fahrenheit = IsDlgButtonChecked(state.window, kFahrenheit) == BST_CHECKED;
     state.working.compactLabels = IsDlgButtonChecked(state.window, kCompact) == BST_CHECKED;
     state.working.roundValues = IsDlgButtonChecked(state.window, kRound) == BST_CHECKED;
+    if (!state.updatesManaged)
+    {
+        state.working.checkForUpdates = IsDlgButtonChecked(state.window, kCheckUpdates) == BST_CHECKED;
+    }
     state.working.firstRunCompleted = true;
     state.working.Normalize();
 }
@@ -180,8 +298,41 @@ LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wParam, LPARA
     switch (message)
     {
     case WM_CREATE:
+        state->dpi = GetDpiForWindow(window);
+        CreateFonts(*state);
         CreateControls(*state);
+        ApplyLayout(*state);
         return 0;
+    case WM_DPICHANGED: {
+        state->dpi = HIWORD(wParam);
+        CreateFonts(*state);
+        ApplyLayout(*state);
+        const auto *suggested = reinterpret_cast<const RECT *>(lParam);
+        const auto size = WindowSize(*state);
+        SetWindowPos(window, nullptr, suggested->left, suggested->top, size.cx, size.cy,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+        return 0;
+    }
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLORBTN: {
+        // Match each control's background to the surface it sits on.
+        const auto id = GetDlgCtrlID(reinterpret_cast<HWND>(lParam));
+        const int surface = id == IDOK || id == IDCANCEL ? COLOR_BTNFACE : COLOR_WINDOW;
+        auto *dc = reinterpret_cast<HDC>(wParam);
+        SetBkColor(dc, GetSysColor(surface));
+        SetTextColor(dc, GetSysColor(COLOR_WINDOWTEXT));
+        return reinterpret_cast<LRESULT>(GetSysColorBrush(surface));
+    }
+    case WM_PAINT: {
+        PAINTSTRUCT paint{};
+        HDC dc = BeginPaint(window, &paint);
+        RECT client{};
+        GetClientRect(window, &client);
+        RECT footer{client.left, Scale(*state, state->footerTop), client.right, client.bottom};
+        FillRect(dc, &footer, GetSysColorBrush(COLOR_BTNFACE));
+        EndPaint(window, &paint);
+        return 0;
+    }
     case WM_COMMAND: {
         const auto id = LOWORD(wParam);
         if (id >= kMetricBase && id < kMetricBase + static_cast<int>(kMetricCount) && HIWORD(wParam) == BN_CLICKED)
@@ -248,15 +399,25 @@ bool SettingsWindow::Show(HINSTANCE instance, HWND owner, Settings &settings, bo
     state.owner = owner;
     state.working = settings;
     state.firstRun = firstRun;
+    state.updatesManaged = UpdateService::DisabledByPolicy();
+
+    // Open on the monitor the user is working on (where the tray was clicked).
+    POINT cursor{};
+    GetCursorPos(&cursor);
+    MONITORINFO monitor{};
+    monitor.cbSize = sizeof(monitor);
+    if (!GetMonitorInfoW(MonitorFromPoint(cursor, MONITOR_DEFAULTTOPRIMARY), &monitor))
+    {
+        SystemParametersInfoW(SPI_GETWORKAREA, 0, &monitor.rcWork, 0);
+    }
 
     if (owner)
     {
         EnableWindow(owner, FALSE);
     }
-    HWND window = CreateWindowExW(WS_EX_DLGMODALFRAME, kClassName,
-                                  firstRun ? L"Stat Wisp — first setup" : L"Stat Wisp settings",
-                                  WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU, CW_USEDEFAULT, CW_USEDEFAULT, 510, 590,
-                                  owner, nullptr, instance, &state);
+    HWND window = CreateWindowExW(kExStyle, kClassName, firstRun ? L"Welcome to Stat Wisp" : L"Stat Wisp settings",
+                                  kStyle, monitor.rcWork.left, monitor.rcWork.top, 100, 100, owner, nullptr, instance,
+                                  &state);
     if (!window)
     {
         if (owner)
@@ -265,15 +426,16 @@ bool SettingsWindow::Show(HINSTANCE instance, HWND owner, Settings &settings, bo
         }
         return false;
     }
-    RECT windowRect{};
-    GetWindowRect(window, &windowRect);
-    const auto width = windowRect.right - windowRect.left;
-    const auto height = windowRect.bottom - windowRect.top;
-    const auto x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
-    const auto y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
-    SetWindowPos(window, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    const auto size = WindowSize(state);
+    const auto workWidth = monitor.rcWork.right - monitor.rcWork.left;
+    const auto workHeight = monitor.rcWork.bottom - monitor.rcWork.top;
+    const auto x = monitor.rcWork.left + (std::max)(0L, (workWidth - size.cx) / 2);
+    const auto y = monitor.rcWork.top + (std::max)(0L, (workHeight - size.cy) / 2);
+    SetWindowPos(window, HWND_TOP, x, y, size.cx, size.cy, SWP_NOACTIVATE);
     ShowWindow(window, SW_SHOW);
     UpdateWindow(window);
+    SetForegroundWindow(window);
+    SetFocus(state.metricControls[0]);
 
     MSG message{};
     int messageResult = 1;
@@ -294,10 +456,11 @@ bool SettingsWindow::Show(HINSTANCE instance, HWND owner, Settings &settings, bo
         // Preserve WM_QUIT for the application's outer message loop.
         PostQuitMessage(static_cast<int>(message.wParam));
     }
+    // The owner is the hidden message window: re-enable it, but let Windows
+    // return activation to the application the user was using before.
     if (owner)
     {
         EnableWindow(owner, TRUE);
-        SetForegroundWindow(owner);
     }
     if (state.accepted)
     {

@@ -31,7 +31,7 @@ std::uint64_t ToInteger(const FILETIME &value) noexcept
 
 } // namespace
 
-void CpuProvider::Collect(MetricSnapshot &snapshot, bool usageNeeded, bool clockNeeded) noexcept
+void CpuProvider::Collect(MetricSnapshot &snapshot, bool usageNeeded, bool clockNeeded)
 {
     if (usageNeeded)
     {

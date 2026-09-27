@@ -95,7 +95,7 @@ struct DiskProvider::Impl
 DiskProvider::DiskProvider() = default;
 DiskProvider::~DiskProvider() = default;
 
-void DiskProvider::Collect(MetricSnapshot &snapshot, bool readNeeded, bool writeNeeded, bool utilizationNeeded) noexcept
+void DiskProvider::Collect(MetricSnapshot &snapshot, bool readNeeded, bool writeNeeded, bool utilizationNeeded)
 {
     if (!impl_)
     {

@@ -17,6 +17,19 @@ namespace statwisp
 namespace
 {
 
+std::string_view Trim(std::string_view text) noexcept
+{
+    while (!text.empty() && (text.front() == ' ' || text.front() == '\t'))
+    {
+        text.remove_prefix(1);
+    }
+    while (!text.empty() && (text.back() == ' ' || text.back() == '\t'))
+    {
+        text.remove_suffix(1);
+    }
+    return text;
+}
+
 bool ParseBool(std::string_view value, bool fallback) noexcept
 {
     if (value == "1" || value == "true")
@@ -199,17 +212,21 @@ bool SettingsStore::Save(const Settings &source) const
     auto temporary = path_;
     temporary += L".tmp";
     {
-        std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
-        if (!stream)
+        const auto serialized = SettingsCodec::Serialize(settings);
+        HANDLE file = CreateFileW(temporary.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+                                  nullptr);
+        if (file == INVALID_HANDLE_VALUE)
         {
             return false;
         }
-        const auto serialized = SettingsCodec::Serialize(settings);
-        stream.write(serialized.data(), static_cast<std::streamsize>(serialized.size()));
-        // Closing flushes the stream's buffer and can fail even when write()
-        // succeeded. Never replace the previous settings with a partial file.
-        stream.close();
-        if (!stream)
+        // Flush the data itself before the rename so a power loss cannot leave
+        // an empty or zero-filled settings file behind the new name.
+        DWORD written = 0;
+        const bool complete = WriteFile(file, serialized.data(), static_cast<DWORD>(serialized.size()), &written,
+                                        nullptr) &&
+                              written == serialized.size() && FlushFileBuffers(file);
+        CloseHandle(file);
+        if (!complete)
         {
             DeleteFileW(temporary.c_str());
             return false;
@@ -283,6 +300,10 @@ Settings SettingsCodec::Deserialize(std::string_view text, bool *migrated, bool 
     std::array<bool, kMetricCount> orderSeen{};
     std::size_t orderCount = 0;
 
+    if (text.starts_with("\xEF\xBB\xBF"))
+    {
+        text.remove_prefix(3); // Hand-edited files are often saved with a UTF-8 BOM.
+    }
     std::size_t lineStart = 0;
     while (lineStart < text.size())
     {
@@ -296,8 +317,8 @@ Settings SettingsCodec::Deserialize(std::string_view text, bool *migrated, bool 
         const auto separator = line.find('=');
         if (separator != std::string_view::npos)
         {
-            const auto key = line.substr(0, separator);
-            const auto value = line.substr(separator + 1);
+            const auto key = Trim(line.substr(0, separator));
+            const auto value = Trim(line.substr(separator + 1));
             if (key == "version")
             {
                 sourceVersion = ParseUnsigned(value, std::numeric_limits<std::uint32_t>::max());

@@ -8,7 +8,7 @@ Search [existing issues](https://github.com/grayfvll01/stat-wisp/issues) first, 
 
 For a feature request, explain the user problem and a concrete example. Hardware support depends on available Windows, display-driver, and external WMI interfaces. A request does not imply a delivery date.
 
-Remove private information from logs and screenshots before posting. Do not attach credentials, personal files, or unrelated system dumps.
+Attach the relevant lines of `%LOCALAPPDATA%stat-wispstat-wisp.log` when useful. Remove private information from logs and screenshots before posting. Report security problems privately as described in [SECURITY.md](SECURITY.md). Do not attach credentials, personal files, or unrelated system dumps.
 
 ## Submit a change
 
@@ -16,7 +16,8 @@ Remove private information from logs and screenshots before posting. Do not atta
 2. Follow the [development guide](docs/development.md) to build and run the checks that apply to your change.
 3. Keep sensor reads off the UI thread, request only needed providers, and show unavailable readings explicitly. Preserve the application's local, per-user operation.
 4. Add regression coverage for behavior changes where it can detect the original failure. Update user documentation when behavior or supported sensors change.
-5. Open a pull request describing the problem, resulting behavior, and checks you actually ran. List hardware-dependent behavior you could not verify.
+5. Add a line under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
+6. Open a pull request describing the problem, resulting behavior, and checks you actually ran. List hardware-dependent behavior you could not verify.
 
 Do not commit generated build folders, binaries, installers, or release archives. Existing source uses C++23, native Win32 APIs, and CMake; keep changes consistent with nearby code.
 

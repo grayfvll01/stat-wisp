@@ -1,15 +1,19 @@
 #pragma once
 
 #include "core/SemanticVersion.h"
+#include "update/UpdateManifest.h"
 
 #include <Windows.h>
 
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
 
 namespace statwisp
 {
@@ -72,12 +76,42 @@ class UpdateService final
     // True when the executable sits beside the Inno Setup uninstaller.
     [[nodiscard]] static bool IsInstalledEdition() noexcept;
     // Best effort: removes stat-wisp.exe.old beside the executable and stale
-    // downloads in workDirectory. Call once at startup.
-    static void CleanupAfterUpdate(const std::filesystem::path &workDirectory) noexcept;
+    // downloads in workDirectory. Call once at startup; after a relaunch, pass a
+    // short retry period because the previous process may still be exiting.
+    static void CleanupAfterUpdate(const std::filesystem::path &workDirectory,
+                                   std::chrono::milliseconds retryFor = std::chrono::milliseconds(0)) noexcept;
 
   private:
+    enum class Request : std::uint8_t
+    {
+        None,
+        Check,
+        Install,
+    };
+    using Sink = std::function<bool(const std::uint8_t *, DWORD)>;
+
+    void Run(std::stop_token stopToken);
+    void Check(bool userInitiated);
+    void Install();
+    [[nodiscard]] bool Download(const UpdateAsset &asset, const std::filesystem::path &destination,
+                                std::wstring &error);
+    [[nodiscard]] bool HttpGet(const std::wstring &url, std::uint64_t maxBytes, const Sink &sink, std::wstring &error);
+    void Publish(const std::function<void(UpdateState &)> &change);
+    [[nodiscard]] bool Cancelled() const;
+
     mutable std::mutex mutex_;
+    std::condition_variable_any wake_;
     UpdateState state_;
+    std::optional<UpdateManifest> manifest_;
+    Request request_{Request::None};
+    bool requestUserInitiated_{};
+    bool automaticChecks_{};
+    bool cancelled_{};
+    HWND notifyWindow_{};
+    UINT notifyMessage_{};
+    void *activeRequest_{}; // HINTERNET of the request in flight; closed by Stop() to cancel it.
+    std::filesystem::path workDirectory_;
+    std::jthread worker_;
 };
 
 } // namespace statwisp

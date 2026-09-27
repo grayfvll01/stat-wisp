@@ -85,7 +85,10 @@ if(MSVC)
     target_compile_options(stat-wisp PRIVATE /W4 /permissive- /EHsc /utf-8 /Zc:__cplusplus)
     target_compile_options(stat_wisp_core PRIVATE /guard:cf)
     target_compile_options(stat-wisp PRIVATE /guard:cf)
-    target_link_options(stat-wisp PRIVATE /OPT:REF /OPT:ICF /MANIFEST:NO /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT /guard:cf)
+    # Imported DLLs resolve from System32 only (0x800), so a portable copy in
+    # Downloads cannot load a planted DLL.
+    target_link_options(stat-wisp PRIVATE /OPT:REF /OPT:ICF /MANIFEST:NO /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT /guard:cf
+        /DEPENDENTLOADFLAG:0x800)
 endif()
 
 install(TARGETS stat-wisp RUNTIME DESTINATION .)
@@ -140,4 +143,8 @@ if(BUILD_TESTING AND STAT_WISP_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test-settings-dialog.ps1 -Executable $<TARGET_FILE:stat-wisp>
         -TestDirectory ${CMAKE_CURRENT_BINARY_DIR}/settings-dialog-test)
     set_tests_properties(stat-wisp-settings-dialog PROPERTIES RUN_SERIAL TRUE TIMEOUT 20)
+    add_test(NAME stat-wisp-update-e2e COMMAND ${POWERSHELL_EXECUTABLE} -NoProfile -File
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test-update.ps1 -Executable $<TARGET_FILE:stat-wisp>
+        -TestDirectory ${CMAKE_CURRENT_BINARY_DIR}/update-test)
+    set_tests_properties(stat-wisp-update-e2e PROPERTIES RUN_SERIAL TRUE TIMEOUT 120)
 endif()

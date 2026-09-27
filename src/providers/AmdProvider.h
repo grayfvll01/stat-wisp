@@ -21,7 +21,7 @@ class AmdProvider final
     {
         return context_ != nullptr && adapterIndex_ >= 0;
     }
-    void Collect(MetricSnapshot &snapshot, const Settings &settings) noexcept;
+    void Collect(MetricSnapshot &snapshot, const Settings &settings);
     void Reset() noexcept;
 
   private:

@@ -151,7 +151,7 @@ bool AmdProvider::Initialize() noexcept
     return true;
 }
 
-void AmdProvider::Collect(MetricSnapshot &snapshot, const Settings &settings) noexcept
+void AmdProvider::Collect(MetricSnapshot &snapshot, const Settings &settings)
 {
     if (!Available())
     {
