@@ -10,7 +10,7 @@
 namespace statwisp
 {
 
-inline constexpr std::uint32_t kSettingsVersion = 2;
+inline constexpr std::uint32_t kSettingsVersion = 3;
 inline constexpr std::array<std::uint32_t, 7> kAllowedUpdateIntervals{500, 1000, 2000, 5000, 10000, 30000, 60000};
 
 struct Settings
@@ -23,6 +23,7 @@ struct Settings
     bool compactLabels{false};
     bool roundValues{true};
     bool startWithWindows{false};
+    bool checkForUpdates{true};
     bool diagnostics{false};
     bool firstRunCompleted{false};
 

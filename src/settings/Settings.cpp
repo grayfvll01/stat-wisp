@@ -258,6 +258,7 @@ std::string SettingsCodec::Serialize(const Settings &source)
     output << "\ncompact_labels=" << (settings.compactLabels ? 1 : 0);
     output << "\nround_values=" << (settings.roundValues ? 1 : 0);
     output << "\nstart_with_windows=" << (settings.startWithWindows ? 1 : 0);
+    output << "\ncheck_for_updates=" << (settings.checkForUpdates ? 1 : 0);
     output << "\ndiagnostics=" << (settings.diagnostics ? 1 : 0);
     output << "\nfirst_run_completed=" << (settings.firstRunCompleted ? 1 : 0) << '\n';
     return output.str();
@@ -346,6 +347,10 @@ Settings SettingsCodec::Deserialize(std::string_view text, bool *migrated, bool 
             else if (key == "start_with_windows" || key == "autostart")
             {
                 settings.startWithWindows = ParseBool(value, settings.startWithWindows);
+            }
+            else if (key == "check_for_updates")
+            {
+                settings.checkForUpdates = ParseBool(value, settings.checkForUpdates);
             }
             else if (key == "diagnostics")
             {

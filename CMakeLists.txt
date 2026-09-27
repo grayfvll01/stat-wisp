@@ -1,6 +1,18 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(stat-wisp VERSION 0.4.1 LANGUAGES CXX RC)
+# VERSION is the single source of the release version (MAJOR.MINOR.PATCH).
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" STAT_WISP_VERSION LIMIT_COUNT 1)
+string(STRIP "${STAT_WISP_VERSION}" STAT_WISP_VERSION)
+if(NOT STAT_WISP_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    message(FATAL_ERROR "VERSION must contain MAJOR.MINOR.PATCH, found '${STAT_WISP_VERSION}'.")
+endif()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
+
+project(stat-wisp VERSION ${STAT_WISP_VERSION} LANGUAGES CXX RC)
+
+set(STAT_WISP_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+configure_file(src/version.h.in "${STAT_WISP_GENERATED_DIR}/version.h" @ONLY)
+configure_file(src/app.manifest.in "${STAT_WISP_GENERATED_DIR}/app.manifest" @ONLY)
 
 option(STAT_WISP_BUILD_TESTS "Build stat-wisp logic tests" ON)
 
@@ -15,17 +27,21 @@ if(MSVC)
 endif()
 
 add_library(stat_wisp_core STATIC
+    src/core/Log.cpp
     src/core/MetricFormatter.cpp
     src/core/SemanticVersion.cpp
     src/settings/Settings.cpp
+    src/update/Sha256.cpp
+    src/update/UpdateManifest.cpp
 )
-target_include_directories(stat_wisp_core PUBLIC src)
+target_include_directories(stat_wisp_core PUBLIC src "${STAT_WISP_GENERATED_DIR}")
 target_compile_definitions(stat_wisp_core PUBLIC UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX WINVER=0x0A00 _WIN32_WINNT=0x0A00)
-target_link_libraries(stat_wisp_core PUBLIC shell32 ole32)
+target_link_libraries(stat_wisp_core PUBLIC bcrypt shell32 ole32)
 
 add_executable(stat-wisp WIN32
     src/main.cpp
     src/app/Application.cpp
+    src/app/CrashHandler.cpp
     src/app/MessageWindow.cpp
     src/monitoring/MonitorService.cpp
     src/providers/AmdProvider.cpp
@@ -42,9 +58,10 @@ add_executable(stat-wisp WIN32
     src/startup/StartupManager.cpp
     src/tray/TrayManager.cpp
     src/tray/TrayRenderer.cpp
+    src/update/UpdateService.cpp
     src/stat-wisp.rc
 )
-target_include_directories(stat-wisp PRIVATE src)
+target_include_directories(stat-wisp PRIVATE src "${STAT_WISP_GENERATED_DIR}")
 target_compile_definitions(stat-wisp PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX WINVER=0x0A00 _WIN32_WINNT=0x0A00)
 target_link_libraries(stat-wisp PRIVATE
     stat_wisp_core
@@ -60,6 +77,7 @@ target_link_libraries(stat-wisp PRIVATE
     shell32
     user32
     wbemuuid
+    winhttp
 )
 
 if(MSVC)
@@ -89,11 +107,18 @@ if(BUILD_TESTING AND STAT_WISP_BUILD_TESTS)
         target_compile_options(stat-wisp-runtime-tests PRIVATE /W4 /permissive- /EHsc /utf-8)
     endif()
     add_test(NAME stat-wisp-runtime COMMAND stat-wisp-runtime-tests)
+    add_executable(stat-wisp-update-tests tests/UpdateTests.cpp src/update/UpdateService.cpp)
+    target_include_directories(stat-wisp-update-tests PRIVATE src "${STAT_WISP_GENERATED_DIR}")
+    target_link_libraries(stat-wisp-update-tests PRIVATE stat_wisp_core advapi32 shell32 user32 winhttp)
+    if(MSVC)
+        target_compile_options(stat-wisp-update-tests PRIVATE /W4 /permissive- /EHsc /utf-8 /Zc:__cplusplus)
+    endif()
+    add_test(NAME stat-wisp-update COMMAND stat-wisp-update-tests)
     # Same application with a deliberately stuck worker, never packaged.
     get_target_property(app_sources stat-wisp SOURCES)
     get_target_property(app_libraries stat-wisp LINK_LIBRARIES)
     add_executable(stat-wisp-shutdown-test WIN32 ${app_sources})
-    target_include_directories(stat-wisp-shutdown-test PRIVATE src)
+    target_include_directories(stat-wisp-shutdown-test PRIVATE src "${STAT_WISP_GENERATED_DIR}")
     target_link_libraries(stat-wisp-shutdown-test PRIVATE ${app_libraries})
     target_compile_definitions(stat-wisp-shutdown-test PRIVATE STAT_WISP_TEST_STALLED_PROVIDER)
     if(MSVC)

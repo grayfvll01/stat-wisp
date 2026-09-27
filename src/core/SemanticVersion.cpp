@@ -46,4 +46,9 @@ std::string SemanticVersion::ToString() const
     return std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(patch);
 }
 
+std::wstring SemanticVersion::ToWString() const
+{
+    return std::to_wstring(major) + L"." + std::to_wstring(minor) + L"." + std::to_wstring(patch);
+}
+
 } // namespace statwisp
